@@ -1,0 +1,14 @@
+.DS_Store
+*.xcuserstate
+*.swp
+*.tmp
+
+# Local build/cache output.
+.build/
+DerivedData/
+__pycache__/
+*.pyc
+
+# Local runtime corpus is outside the repo by design, but keep this ignored if
+# someone creates a test corpus here while debugging.
+Corpus/

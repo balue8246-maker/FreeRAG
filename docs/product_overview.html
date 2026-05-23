@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FreeRAG 产品说明</title>
+  <style>
+    :root {
+      --ink: #121417;
+      --muted: #626a73;
+      --line: #dfe3e8;
+      --soft: #f6f7f9;
+      --panel: #ffffff;
+      --blue: #1f3c88;
+      --red: #d74848;
+      --pink: #e86f88;
+      --green: #2c7a63;
+      --shadow: 0 18px 50px rgba(18, 20, 23, 0.10);
+      --radius: 8px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html {
+      background: #f4f5f7;
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+      letter-spacing: 0;
+    }
+
+    body {
+      margin: 0;
+      line-height: 1.55;
+    }
+
+    .page {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 40px 24px 64px;
+    }
+
+    .hero {
+      min-height: 480px;
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 28px;
+      align-items: center;
+      padding: 44px;
+      background:
+        linear-gradient(135deg, rgba(31, 60, 136, 0.08), rgba(215, 72, 72, 0.08)),
+        var(--panel);
+      border: 1px solid rgba(18, 20, 23, 0.08);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 34px;
+    }
+
+    .brand img {
+      width: 54px;
+      height: 54px;
+      border-radius: 12px;
+      box-shadow: 0 8px 22px rgba(18, 20, 23, 0.18);
+    }
+
+    .brand strong {
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .brand span {
+      display: block;
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    h1 {
+      margin: 0;
+      max-width: 700px;
+      font-size: 48px;
+      line-height: 1.08;
+      font-weight: 760;
+      letter-spacing: 0;
+    }
+
+    .lead {
+      margin: 22px 0 0;
+      max-width: 650px;
+      color: #323840;
+      font-size: 18px;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 28px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      height: 34px;
+      padding: 0 13px;
+      border: 1px solid rgba(18, 20, 23, 0.11);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.72);
+      color: #2d333a;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .product-card {
+      background: rgba(255, 255, 255, 0.78);
+      border: 1px solid rgba(18, 20, 23, 0.08);
+      border-radius: 12px;
+      padding: 22px;
+    }
+
+    .hud {
+      width: fit-content;
+      margin: 8px 0 24px auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 9px;
+      border: 1px solid rgba(18, 20, 23, 0.12);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.86);
+      box-shadow: 0 14px 35px rgba(18, 20, 23, 0.12);
+    }
+
+    .hud .icon {
+      width: 30px;
+      height: 30px;
+      display: grid;
+      place-items: center;
+      border-radius: 9px;
+      color: #303640;
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .hud .muted {
+      color: #8a929b;
+      border-left: 1px solid var(--line);
+      border-radius: 0;
+      padding-left: 12px;
+      width: 38px;
+    }
+
+    .flow {
+      display: grid;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .step {
+      display: grid;
+      grid-template-columns: 38px 1fr;
+      gap: 12px;
+      align-items: start;
+      padding: 14px;
+      border: 1px solid rgba(18, 20, 23, 0.08);
+      border-radius: var(--radius);
+      background: #fff;
+    }
+
+    .num {
+      width: 30px;
+      height: 30px;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: #eef1f7;
+      color: var(--blue);
+      font-weight: 750;
+      font-size: 13px;
+    }
+
+    .step strong {
+      display: block;
+      margin-bottom: 2px;
+      font-size: 15px;
+    }
+
+    .step span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    section {
+      margin-top: 28px;
+      padding: 30px;
+      background: var(--panel);
+      border: 1px solid rgba(18, 20, 23, 0.08);
+      border-radius: 12px;
+    }
+
+    h2 {
+      margin: 0 0 8px;
+      font-size: 24px;
+      line-height: 1.2;
+      font-weight: 730;
+    }
+
+    .section-lead {
+      margin: 0 0 22px;
+      max-width: 760px;
+      color: var(--muted);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .tile {
+      min-height: 168px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--soft);
+    }
+
+    .tile h3 {
+      margin: 0 0 8px;
+      font-size: 16px;
+    }
+
+    .tile p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .list {
+      margin: 0;
+      padding-left: 18px;
+      color: #353b43;
+    }
+
+    .list li { margin: 8px 0; }
+
+    .mono {
+      padding: 18px;
+      overflow: auto;
+      border-radius: var(--radius);
+      background: #111418;
+      color: #eef1f4;
+      font-family: "SF Mono", Menlo, Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .badge-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 16px;
+    }
+
+    .badge {
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: #eef1f7;
+      color: #27303a;
+      font-size: 12px;
+      border: 1px solid rgba(18, 20, 23, 0.07);
+    }
+
+    .badge.red { background: #fff0f0; color: #a83333; }
+    .badge.blue { background: #eef3ff; color: #1f3c88; }
+    .badge.green { background: #edf8f4; color: #276b57; }
+
+    .status {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .status-card {
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+    }
+
+    .status-card h3 { margin: 0 0 10px; }
+
+    footer {
+      margin-top: 26px;
+      color: var(--muted);
+      text-align: center;
+      font-size: 13px;
+    }
+
+    @media (max-width: 860px) {
+      .page { padding: 20px 14px 44px; }
+      .hero { grid-template-columns: 1fr; padding: 26px; }
+      h1 { font-size: 36px; }
+      .lead { font-size: 16px; }
+      .grid, .two-col, .status { grid-template-columns: 1fr; }
+      section { padding: 22px; }
+      .hud { margin-left: 0; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <div>
+        <div class="brand">
+          <img src="../FreeRAG/Resources/Assets/freerag_icon_source.png" alt="FreeRAG app icon">
+          <div>
+            <strong>FreeRAG</strong>
+            <span>Mac 本地语料入口 + MyRAG skill</span>
+          </div>
+        </div>
+        <h1>把 Mac 上的零散信息，顺手变成 LLM 可深挖的本地语料。</h1>
+        <p class="lead">FreeRAG 负责低成本收集屏幕、剪贴板和语音原材料；MyRAG 负责检索、多视角深读、证据校准和处理结果沉淀。它不是笔记软件，而是面向 AI 的原材料工坊。</p>
+        <div class="hero-actions">
+          <span class="pill">本地优先</span>
+          <span class="pill">菜单栏常驻</span>
+          <span class="pill">原生 Mac app</span>
+          <span class="pill">中文 MyRAG skill</span>
+        </div>
+      </div>
+
+      <div class="product-card">
+        <div class="hud" aria-label="FreeRAG floating HUD preview">
+          <div class="icon">●</div>
+          <div class="icon">⌘</div>
+          <div class="icon">♪</div>
+          <div class="icon muted">□</div>
+          <div class="icon muted">◌</div>
+        </div>
+        <div class="flow">
+          <div class="step">
+            <div class="num">1</div>
+            <div><strong>收集</strong><span>连续屏幕证据、单次截图、剪贴板文字/图片、本地语音。</span></div>
+          </div>
+          <div class="step">
+            <div class="num">2</div>
+            <div><strong>落盘</strong><span>写入 ~/Documents/Corpus，生成索引、元数据和 LLM 上下文。</span></div>
+          </div>
+          <div class="step">
+            <div class="num">3</div>
+            <div><strong>归拢</strong><span>MyRAG 先把乱语料收束成候选事项，让用户确认。</span></div>
+          </div>
+          <div class="step">
+            <div class="num">4</div>
+            <div><strong>深挖</strong><span>确认方向后，多视角阅读、证据校准，再选择出口。</span></div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <section>
+      <h2>产品边界</h2>
+      <p class="section-lead">FreeRAG 的价值不在于把采集端做成复杂知识库，而在于把原材料收得足够顺，再让 LLM 在需要时处理得足够深。</p>
+      <div class="grid">
+        <div class="tile">
+          <h3>FreeRAG App</h3>
+          <p>安静常驻，负责即时采集和本地落盘。它尽量不解释、不打扰、不联网。</p>
+        </div>
+        <div class="tile">
+          <h3>语料目录</h3>
+          <p>稳定目录协议，保留原始文件、索引、上下文和 processed 处理层。</p>
+        </div>
+        <div class="tile">
+          <h3>MyRAG Skill</h3>
+          <p>中文优先，检索本地 RAG，按多个镜头深读，再把结果写回处理层。</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>采集能力</h2>
+      <p class="section-lead">四个入口覆盖多数日常零散信息：正在看的屏幕、瞬间截图、复制内容、口头上下文。</p>
+      <div class="grid">
+        <div class="tile">
+          <h3>连续收集</h3>
+          <p>对当前窗口/屏幕做证据采样，过滤近似重复画面，停止后生成 storyboard。</p>
+        </div>
+        <div class="tile">
+          <h3>单次截图</h3>
+          <p>一键保存当前上下文，使用同一语料协议，不弹预览。</p>
+        </div>
+        <div class="tile">
+          <h3>剪贴板</h3>
+          <p>后台保存合理大小的文字和图片，抑制重复，忽略超大 payload。</p>
+        </div>
+        <div class="tile">
+          <h3>语音</h3>
+          <p>本地保存 16 kHz mono WAV 和占位 transcript，后续再转写。</p>
+        </div>
+        <div class="tile">
+          <h3>原材料库</h3>
+          <p>轻量浏览 raw entries，快速打开条目或 Finder 目录。</p>
+        </div>
+        <div class="tile">
+          <h3>权限准备</h3>
+          <p>集中处理屏幕录制、辅助功能、麦克风和登录时自动启动。</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>语料协议</h2>
+      <p class="section-lead">目录结构对人类保持可读，对 LLM 保持稳定。FreeRAG 只写 raw，MyRAG 写 processed。</p>
+      <pre class="mono">~/Documents/Corpus/
+  _index.json
+  _library.json
+  README_FOR_LLM.md
+  screen/
+  clipboard/
+  voice/
+  processed/
+    &lt;entry_id&gt;/
+      brief.md
+      deep_read.md
+      facts.json
+      citations.md
+      open_questions.md</pre>
+    </section>
+
+    <section>
+      <h2>MyRAG 深挖方式</h2>
+      <p class="section-lead">MyRAG 不停留在关键词召回。面对散乱语料时，它先归拢出候选事项，让用户确认；确认后再选择少数相关镜头反复读材料，最后做证据校准和收束。</p>
+      <div class="two-col">
+        <div>
+          <h3>通用镜头</h3>
+          <ul class="list">
+            <li>事实、时间、关系、意图</li>
+            <li>结构、细节、偏好、矛盾</li>
+            <li>模式、取舍、行动、复用</li>
+            <li>反方攻击：最脆弱证据和假设</li>
+          </ul>
+        </div>
+        <div>
+          <h3>证据校准</h3>
+          <ul class="list">
+            <li>可验证事实</li>
+            <li>材料主张</li>
+            <li>意图 / 愿望</li>
+            <li>我的推断</li>
+          </ul>
+        </div>
+      </div>
+      <div class="badge-row">
+        <span class="badge blue">主题归拢</span>
+        <span class="badge blue">找事实</span>
+        <span class="badge blue">复盘</span>
+        <span class="badge blue">做决策</span>
+        <span class="badge blue">提取偏好</span>
+        <span class="badge blue">排错</span>
+        <span class="badge blue">生活碎片</span>
+      </div>
+    </section>
+
+    <section>
+      <h2>深挖后的三个出口</h2>
+      <p class="section-lead">MyRAG 不无限扩展。它把本地语料挖透后，只做明确收束。</p>
+      <div class="grid">
+        <div class="tile">
+          <h3>存工作日志</h3>
+          <p>当这次思考本身有价值，生成 Markdown，保存到 processed/_worklogs。</p>
+        </div>
+        <div class="tile">
+          <h3>结合已有项目</h3>
+          <p>需要挂到项目时，先问项目和路径，再读取项目资料做合并。</p>
+        </div>
+        <div class="tile">
+          <h3>外部调研</h3>
+          <p>本地 RAG 缺最新事实或第三方证据时，再进入 websearch，并分开标注来源。</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>当前状态</h2>
+      <div class="status">
+        <div class="status-card">
+          <h3>已到位</h3>
+          <ul class="list">
+            <li>Swift/AppKit 原生 app，菜单栏 + 浮窗。</li>
+            <li>剪贴板、截图、屏幕采样、语音落盘。</li>
+            <li>_library.json、llm_context、README_FOR_LLM。</li>
+            <li>MyRAG 中文深挖协议和检索脚本。</li>
+          </ul>
+        </div>
+        <div class="status-card">
+          <h3>下一轮重点</h3>
+          <ul class="list">
+            <li>真实权限状态和授权后重启体验。</li>
+            <li>Library UI 精修和 processed 入口。</li>
+            <li>屏幕采样稳定退避。</li>
+            <li>MyRAG 工作日志辅助命令。</li>
+          </ul>
+        </div>
+      </div>
+      <div class="badge-row">
+        <span class="badge green">可本地测试</span>
+        <span class="badge red">尚未公证</span>
+        <span class="badge">DMG 后续打包</span>
+      </div>
+    </section>
+
+    <footer>
+      FreeRAG · 面向 LLM 的本地原材料入口 · 2026-05-23
+    </footer>
+  </main>
+</body>
+</html>
