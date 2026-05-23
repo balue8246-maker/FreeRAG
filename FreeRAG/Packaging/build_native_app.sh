@@ -6,6 +6,7 @@ NATIVE="$ROOT/FreeRAG"
 APP="$ROOT/dist/FreeRAG.app"
 EXE="$APP/Contents/MacOS/FreeRAG"
 ICON="$NATIVE/Resources/Assets/freerag.icns"
+STATUS_ICON="$NATIVE/Resources/Assets/freerag_status_template.png"
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
@@ -25,6 +26,9 @@ if [ -f "$ICON" ]; then
   cp "$ICON" "$APP/Contents/Resources/AppIcon.icns"
   /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string AppIcon" "$APP/Contents/Info.plist" 2>/dev/null \
     || /usr/libexec/PlistBuddy -c "Set :CFBundleIconFile AppIcon" "$APP/Contents/Info.plist"
+fi
+if [ -f "$STATUS_ICON" ]; then
+  cp "$STATUS_ICON" "$APP/Contents/Resources/StatusIcon.png"
 fi
 
 codesign --force --deep --sign - "$APP" >/dev/null

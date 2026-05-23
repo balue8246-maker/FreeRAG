@@ -57,6 +57,88 @@ FreeRAG 会写入：
 - `facts.json`：结构化事实、实体、数值、表格、时间线、行动项
 - `citations.md`：证据来源，写清原材料文件名、截图帧、时间戳、图片名
 - `open_questions.md`：材料不足、互相矛盾、需要用户补充或人工确认的问题
+- `ocr.md`：图片、截图、storyboard 中的可读文字、界面状态和视觉观察
+- `transcript.md`：语音转写、说话意图、约束、行动项和情绪强度
+- `timeline.md`：屏幕多帧、录屏式采样或过程型材料的时间线
+- `tables.csv` 或 `tables/*.csv`：截图表格、网页表格、对比表、价格表等结构化数据；字段要保留原始值、来源和置信度
+
+当条目已经完成深挖并且可复用结果已经写入 `processed/<entry_id>/` 后，运行：
+
+```bash
+python3 scripts/myrag_search.py --mark-processed "<entry_id>" --note "简短说明"
+```
+
+这会在原材料目录写入 `_myrag_done.json`，并在 `processed/<entry_id>/_myrag_status.json` 留 MyRAG 自己的状态。FreeRAG 原材料库的“一键清理已处理过语料”只读取 raw 目录的 `_myrag_done.json`，不读取、不解释、不管理 `processed/` 里的处理内容。不要在只是创建模板、还没完成证据校准或还没写回处理层时标记。
+
+
+
+## 并发处理 / 主脑汇总
+
+MyRAG 遇到多条、多模态、可并行阅读的语料时，应该采用“主会话分派，子 agent 阅读，主会话汇总”的模式。
+
+主会话职责：
+
+- 明确用户问题和本轮处理目标。
+- 建立材料清单，按主题、时间段、模态或 entry id 分组。
+- 判断哪些工作可以并发，哪些必须等前置结果。
+- 给每个子 agent 明确边界：只读哪些 entry、输出什么格式、不要改其他材料。
+- 汇总所有子 agent 的观察，做证据校准、反方攻击、交叉合并和最终回答。
+- 决定哪些 entry 已经真正处理完成，再统一执行 `--mark-processed`。
+
+子 agent 适合承担：
+
+- 图片 / 截图 OCR、视觉观察、表格抽取和 `tables.csv` 草案。
+- 屏幕 storyboard 的时间线复盘和状态变化记录。
+- 语音转写、语义整理、行动项抽取。
+- 某个主题簇、时间段或 entry id 列表的局部深读。
+- 去重、低价值噪音识别、候选事项证据整理。
+
+子 agent 输出格式必须便于主脑合并：
+
+```markdown
+# 子任务结果
+
+## 范围
+- entry id / 路径：
+- 模态：text / image / screen / voice / mixed
+
+## 关键观察
+- 事实：
+- 主张：
+- 推断：
+- 不确定：
+
+## 结构化产物
+- OCR / transcript / timeline / tables.csv 是否建议写回：
+- 表格字段或 CSV 草案：
+
+## 证据引用
+- 原材料文件、截图帧、音频时间、文本片段：
+
+## 建议状态
+- 是否可标记 `_myrag_done.json`：是 / 否
+- 原因：
+```
+
+并发规则：
+
+- 可并发就并发，但不要让多个子 agent 写同一个文件；写文件前先分配目录或文件名。
+- 图片、屏幕、语音、文本可以分给不同子 agent 先读；最终结论只能由主会话合成。
+- 如果需要写回 processed，优先由主会话统一落盘，或把不同子 agent 的写入范围拆开，例如 `ocr.md`、`timeline.md`、`tables/<name>.csv`。
+- 子 agent 不负责最终回答用户，也不负责长期项目合并；它们只提供证据和局部判断。
+- 对 20 条以上或多模态混合语料，默认先并发抽样 / 分簇，再汇总判断是否继续深挖。
+- 对大量 clipboard image，先运行 `--image-clusters` 按文件 SHA-256 做精确去重；`count` 是完全相同图片出现次数，不是相似图聚类。主会话只把每簇代表图分给视觉子 agent。
+
+## 多模态处理责任
+
+MyRAG 不是只按 raw 类型列清单。接盘 FreeRAG 原材料后，应主动把不同材料读成可复用处理层：
+
+- 图片 / 截图：做 OCR、视觉观察、界面状态理解；有表格就抽 CSV。
+- 屏幕 storyboard：按时间线理解操作过程、状态变化和前后文。
+- 音频：先转写，再提取意图、约束、行动项和可引用原话。
+- 混合批次：把文本、图片、屏幕、语音一起归拢成候选事项，再深挖。
+
+处理结果只写入 `processed/<entry_id>/`。MyRAG 唯一需要回写给 raw 的信号是 `_myrag_done.json`，意思是“这条原材料已经被 MyRAG 读过并接盘，FreeRAG 可以在用户确认后一键清理 raw”。
 
 ## 检索方式
 
@@ -73,8 +155,10 @@ python3 scripts/myrag_search.py "<查询>" --format text
 python3 scripts/myrag_search.py --entry "<entry_id>" --format text
 python3 scripts/myrag_search.py --recent 10 --format text
 python3 scripts/myrag_search.py --suggest-projects 40 --format text
+python3 scripts/myrag_search.py --image-clusters 40
 python3 scripts/myrag_search.py "<查询>" --deep-plan --format text
 python3 scripts/myrag_search.py --init-processed "<entry_id>"
+python3 scripts/myrag_search.py --mark-processed "<entry_id>" --note "已写回 brief/deep_read/facts/citations"
 ```
 
 脚本随 skill 一起放在 `scripts/myrag_search.py`。如果已安装到 Claude 工具目录，也可使用：`$HOME/.claude/tools/myrag_search.py`。
@@ -95,7 +179,7 @@ python3 scripts/myrag_search.py --init-processed "<entry_id>"
 8. **证据校准**：把材料里的内容分成事实、主张、愿望、推断、噪音；给关键结论标置信心。
 9. **反向审视**：问一句“如果反对这个结论，最容易攻击哪里？”补上矛盾、缺口和反例。
 10. **交叉合并**：把多轮观察合并成结论、证据、矛盾、置信度和缺口。
-11. **写回处理层**：对有价值的条目更新 `brief.md`、`deep_read.md`、`facts.json`、`citations.md`。
+11. **写回处理层**：对有价值的条目更新 `brief.md`、`deep_read.md`、`facts.json`、`citations.md`。确认处理完成后，再用 `--mark-processed` 标记，供 FreeRAG 清理原材料。
 12. **回答用户**：先给结论，再给证据和不确定性。不要直接甩原始 JSON，除非用户要求。
 13. **收束出口**：深挖到这里停止，不把自己扩展成项目管理或外部研究系统。只判断下一步属于下面三类。
 
@@ -243,7 +327,9 @@ MyRAG 的终点不是“继续无限分析”，而是把本地 RAG 挖透后给
 
 - 读文字内容、界面状态、视觉层级、空间关系、前后帧变化。
 - 对截图不要只 OCR；还要读“用户当时在做什么”和“界面暴露了什么状态”。
-- 多帧 storyboard 要按时间顺序读，再横向比较差异。
+- 多帧 storyboard 要按时间顺序读，再横向比较差异，必要时写入 `timeline.md`。
+- 如果图里有表格、报价、参数、排期、清单、对比矩阵，必须抽成 CSV；单表优先写 `tables.csv`，多表写入 `tables/<短表名>.csv`。
+- CSV 字段应尽量包含 `source`、`table_name`、`row_index`、原始列名、`confidence`、`note`；不要把不确定值改写成看似确定的数字。
 
 剪贴板：
 
@@ -253,8 +339,9 @@ MyRAG 的终点不是“继续无限分析”，而是把本地 RAG 挖透后给
 
 语音：
 
-- 如果只有录音和待转写占位，先说明需要转写或只记录已有元数据。
+- 如果只有录音和待转写占位，MyRAG 应先转写或明确需要转写能力；转写结果写入 `transcript.md`。
 - 如果已有 transcript，提取意图、约束、情绪强度、决策、行动项。
+- 语音里出现的列表、报价、排期、参数或对比，也可以抽成 `tables.csv`。
 
 ## 写回格式
 

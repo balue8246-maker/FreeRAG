@@ -4,10 +4,12 @@
 """
 
 import argparse
+import hashlib
 import io
 import json
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
@@ -16,6 +18,8 @@ CORPUS = Path.home() / "Documents" / "Corpus"
 INDEX = CORPUS / "_index.json"
 LIBRARY = CORPUS / "_library.json"
 PROCESSED = CORPUS / "processed"
+RAW_PROCESSED_MARKER = "_myrag_done.json"
+PROCESSED_STATUS = "_myrag_status.json"
 KIMI = str(Path.home() / ".claude" / "tools" / "kimi.js")
 
 DEEP_LENSES = [
@@ -99,6 +103,21 @@ def processed_dir(entry_id: str) -> Path:
     return PROCESSED / entry_id
 
 
+def raw_processed_marker(entry: dict) -> Path:
+    return entry_dir(entry) / RAW_PROCESSED_MARKER
+
+
+def processed_status_path(entry_id: str) -> Path:
+    return processed_dir(entry_id) / PROCESSED_STATUS
+
+
+def is_marked_processed(entry: dict) -> bool:
+    entry_id = str(entry.get("id", ""))
+    if not entry_id:
+        return False
+    return raw_processed_marker(entry).exists() or processed_status_path(entry_id).exists()
+
+
 def read_processed(entry_id: str) -> str:
     if not entry_id:
         return ""
@@ -106,7 +125,7 @@ def read_processed(entry_id: str) -> str:
     if not root.exists():
         return ""
     parts = []
-    for name in ("brief.md", "deep_read.md", "facts.json", "citations.md", "open_questions.md"):
+    for name in ("brief.md", "deep_read.md", "facts.json", "citations.md", "open_questions.md", "ocr.md", "transcript.md", "timeline.md", "tables.csv"):
         path = root / name
         text = read_text(path, 16000)
         if text:
@@ -186,6 +205,7 @@ def build_result(entry: dict, score: int, content: str) -> dict:
         "path": entry.get("path", ""),
         "processed_path": processed_path,
         "has_processed": processed_dir(entry_id).exists(),
+        "is_marked_processed": is_marked_processed(entry),
         "content": content[:16000],
     }
 
@@ -242,11 +262,69 @@ def suggest_projects(limit: int) -> list[dict]:
             "summary": str(entry.get("summary", ""))[:240],
             "path": entry.get("path", ""),
             "processed_path": entry.get("processed_path", f"processed/{entry_id}/"),
+            "is_marked_processed": is_marked_processed(entry),
             "signals": extract_signals(content, entry),
             "preview": compact_preview(content),
         })
     return output
 
+
+
+def image_hash(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def image_dimensions(path: Path) -> str:
+    data = path.read_bytes()[:32]
+    if data.startswith(b"\x89PNG\r\n\x1a\n") and len(data) >= 24:
+        width = int.from_bytes(data[16:20], "big")
+        height = int.from_bytes(data[20:24], "big")
+        return f"{width}x{height}"
+    return ""
+
+
+def image_clusters(limit: int = 40) -> list[dict]:
+    entries, _ = load_index()
+    clusters: dict[str, dict] = {}
+    for entry in entries:
+        if entry.get("type") != "clipboard" or entry.get("subtype") != "image":
+            continue
+        path = entry_dir(entry) / "image.png"
+        if not path.exists():
+            continue
+        try:
+            digest = image_hash(path)
+            size = image_dimensions(path)
+            bytes_len = path.stat().st_size
+        except OSError:
+            continue
+        cluster = clusters.setdefault(digest, {
+            "sha256": digest,
+            "count": 0,
+            "sample_entry": str(entry.get("id", "")),
+            "sample_path": str(path.relative_to(CORPUS)),
+            "sample_title": str(entry.get("title", "")),
+            "dimensions": size,
+            "bytes": bytes_len,
+            "titles": {},
+            "entries": [],
+        })
+        cluster["count"] += 1
+        title = str(entry.get("title", ""))
+        cluster["titles"][title] = cluster["titles"].get(title, 0) + 1
+        if len(cluster["entries"]) < 12:
+            cluster["entries"].append(str(entry.get("id", "")))
+    output = []
+    for cluster in clusters.values():
+        titles = sorted(cluster["titles"].items(), key=lambda kv: (-kv[1], kv[0]))
+        cluster["titles"] = [{"title": k, "count": v} for k, v in titles[:8]]
+        output.append(cluster)
+    output.sort(key=lambda item: (-int(item["count"]), str(item["sample_entry"])))
+    return output[:limit]
 
 def read_project_material(entry: dict) -> str:
     root = entry_dir(entry)
@@ -336,6 +414,9 @@ def init_processed(entry_id: str) -> dict:
             "实体": [],
             "事实": [],
             "数值": [],
+            "表格": [],
+            "图片观察": [],
+            "音频转写": [],
             "时间线": [],
             "行动项": [],
             "风险": [],
@@ -346,6 +427,10 @@ def init_processed(entry_id: str) -> dict:
         }, ensure_ascii=False, indent=2) + "\n",
         "citations.md": "# 证据来源\n\n",
         "open_questions.md": "# 待确认问题\n\n",
+        "ocr.md": "# 图片 / 截图 OCR 与视觉观察\n\n## 可读文字\n\n## 界面状态与画面观察\n\n## 表格线索\n\n",
+        "transcript.md": "# 音频转写\n\n## 原始转写\n\n## 说话意图与行动项\n\n",
+        "timeline.md": "# 屏幕 / 多帧时间线\n\n",
+        "tables.csv": "source,table_name,row_index,column,value,confidence,note\n",
     }
     written = []
     skipped = []
@@ -357,6 +442,37 @@ def init_processed(entry_id: str) -> dict:
             path.write_text(body, encoding="utf-8")
             written.append(name)
     return {"条目id": entry_id, "目录": str(root), "已创建": written, "已存在": skipped}
+
+
+def mark_processed(entry_id: str, note: str = "") -> dict:
+    entries, _ = load_index()
+    entry = next((e for e in entries if str(e.get("id", "")) == entry_id), None)
+    if not entry:
+        return {"错误": f"没有找到条目: {entry_id}"}
+
+    raw_root = entry_dir(entry)
+    processed_root = processed_dir(entry_id)
+    processed_root.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "schema": "myrag.raw_processed_marker.v1",
+        "entry_id": entry_id,
+        "status": "processed",
+        "marked_at": datetime.now().isoformat(timespec="seconds"),
+        "raw_path": str(raw_root),
+        "processed_path": str(processed_root),
+        "marker_for": "FreeRAG 一键清理已处理过语料",
+        "status_file_for": "MyRAG 自己记录处理状态，FreeRAG 不读取 processed 状态",
+        "note": note,
+    }
+    written = []
+    if raw_root.exists():
+        raw_marker = raw_root / RAW_PROCESSED_MARKER
+        raw_marker.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        written.append(str(raw_marker))
+    status = processed_root / PROCESSED_STATUS
+    status.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    written.append(str(status))
+    return {"条目id": entry_id, "状态": "已标记处理完成", "写入": written}
 
 
 def ocr(img_path: str) -> str:
@@ -389,7 +505,7 @@ def add_deep_plan(payload: dict) -> dict:
     ]
     payload["处理建议"] = {
         "写回目录": "processed/<entry_id>/",
-        "推荐文件": ["brief.md", "deep_read.md", "facts.json", "citations.md", "open_questions.md"],
+        "推荐文件": ["brief.md", "deep_read.md", "facts.json", "citations.md", "open_questions.md", "ocr.md", "transcript.md", "timeline.md", "tables.csv"],
         "原则": "先判断场景，再选择少数镜头逐轮读材料，最后做证据校准和反方攻击；不要一遍看完就泛泛总结。"
     }
     payload["证据校准"] = {
@@ -416,6 +532,13 @@ def add_deep_plan(payload: dict) -> dict:
         }
     ]
     payload["归拢提醒"] = "如果语料很散，先把条目归成 3-8 个候选事项给用户确认，再进入工作日志、项目结合或外部调研。"
+    payload["并发处理建议"] = {
+        "模式": "主会话分派，子 agent 并发读材料，主会话统一汇总。",
+        "适用": "20 条以上、多模态混合、图片/音频/屏幕可独立处理时默认采用。",
+        "可分派任务": ["图片 OCR 与表格抽取", "屏幕 storyboard 时间线", "语音转写与行动项", "文本条目主题深读", "低价值噪音和重复项识别"],
+        "子 agent 输出": ["范围", "关键观察", "结构化产物", "证据引用", "是否建议标记 _myrag_done.json"],
+        "汇总原则": "最终结论、证据校准、反方攻击、写回 processed 和 --mark-processed 由主会话负责。"
+    }
     return payload
 
 
@@ -441,6 +564,7 @@ def print_text(results: list[dict], deep_plan: bool) -> None:
         print(f"- 原材料路径: ~/Documents/Corpus/{item.get('path')}")
         print(f"- 处理目录: ~/Documents/Corpus/{item.get('processed_path')}")
         print(f"- 已处理: {'是' if item.get('has_processed') else '否'}")
+        print(f"- 清理标记: {'已标记' if item.get('is_marked_processed') else '未标记'}")
         summary = item.get("summary") or ""
         if summary:
             print(f"- 摘要: {summary}")
@@ -479,6 +603,7 @@ def print_project_suggestions(items: list[dict]) -> None:
         print(f"- 类型: {item.get('type')} / {item.get('subtype')}")
         print(f"- 时间: {item.get('time')}")
         print(f"- 路径: ~/Documents/Corpus/{item.get('path')}")
+        print(f"- 清理标记: {'已标记' if item.get('is_marked_processed') else '未标记'}")
         signals = item.get("signals") or []
         if signals:
             print(f"- 信号词: {'、'.join(signals)}")
@@ -501,11 +626,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--entry", help="按 entry id 精确读取")
     parser.add_argument("--recent", type=int, help="读取最近 N 条")
     parser.add_argument("--suggest-projects", type=int, help="读取最近 N 条，供 LLM 归拢成候选项目/主题")
+    parser.add_argument("--image-clusters", type=int, help="按精确 SHA-256 折叠 clipboard image，输出重复簇代表样本")
     parser.add_argument("--limit", type=int, default=5, help="最多返回条数")
     parser.add_argument("--format", choices=["json", "text"], default="json", help="输出格式")
     parser.add_argument("--ocr", action="store_true", help="对 screen storyboard 尝试 OCR")
     parser.add_argument("--deep-plan", action="store_true", help="附带多视角深挖建议")
     parser.add_argument("--init-processed", help="为指定 entry id 创建中文 processed 模板")
+    parser.add_argument("--mark-processed", help="把指定 entry id 标记为已处理，供 FreeRAG 一键清理原材料")
+    parser.add_argument("--note", default="", help="配合 --mark-processed 记录处理说明")
     return parser.parse_args()
 
 
@@ -516,13 +644,20 @@ def main() -> int:
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         return 0
 
+    if args.mark_processed:
+        payload = mark_processed(args.mark_processed, args.note)
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
+
     entries, source = load_index()
     if not entries:
         payload = {"错误": "没有找到语料索引", "语料目录": str(CORPUS)}
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         return 1
 
-    if args.entry:
+    if args.image_clusters:
+        results = image_clusters(args.image_clusters)
+    elif args.entry:
         results = get_entry(args.entry, include_ocr=args.ocr)
     elif args.suggest_projects:
         results = suggest_projects(args.suggest_projects)
@@ -548,6 +683,8 @@ def main() -> int:
         "结果数": len(results),
         "results": results,
     }
+    if args.image_clusters:
+        payload["说明"] = "clipboard image 已按文件内容 SHA-256 精确折叠；count 表示完全相同图片出现次数，不是相似图聚类。"
     if args.suggest_projects:
         payload = add_project_suggestion_plan(payload)
     if args.deep_plan:

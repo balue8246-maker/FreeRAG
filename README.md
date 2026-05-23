@@ -21,9 +21,20 @@ FreeRAG/Packaging/build_native_app.sh
 dist/FreeRAG.app
 ```
 
+当前版本：`0.5.0`，构建号 `2`。版本号写在 `FreeRAG/Info.plist`：
+
+- `CFBundleShortVersionString`：用户可见版本，例如 `0.4.0`。
+- `CFBundleVersion`：构建号，每次发包递增。
+
+升级时保持 `CFBundleIdentifier = com.acegent.freerag` 不变。macOS 权限主要跟 bundle id、签名身份和安装位置相关；只改版本号不应该要求用户重新授权。
+
 ## 产品边界
 
-FreeRAG app 只做本地原材料收集，不自动 OCR、不自动转写、不自动联网分析。MyRAG skill 负责读取本地语料、做多视角深挖、证据校准，并把处理结果写回 `processed/<entry_id>/`。
+FreeRAG app 只做本地原材料收集，不自动 OCR、不自动转写、不自动联网分析。MyRAG skill 负责读取本地语料，处理图片/屏幕/音频信息，产出 OCR、转写、timeline、CSV 表格、多视角深挖和证据校准结果，并写回 `processed/<entry_id>/`。
+
+MyRAG 确认某条原材料已经处理完成后，会写入 `_myrag_done.json` 标记。FreeRAG 原材料库里的“一键清理已处理过语料”只清理带标记的 raw 目录，并保留 `processed/` 里的沉淀结果。
+
+对大量剪贴板图片，MyRAG 先用 `python3 shared/skills/myrag/scripts/myrag_search.py --image-clusters 40` 按 SHA-256 精确折叠重复图，再把代表样本交给视觉/OCR 子 agent。
 
 核心语料目录：
 

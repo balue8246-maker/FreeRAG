@@ -14,6 +14,7 @@ let clipRoot = corpusRoot.appendingPathComponent("clipboard")
 let processedRoot = corpusRoot.appendingPathComponent("processed")
 let indexURL = corpusRoot.appendingPathComponent("_index.json")
 let libraryURL = corpusRoot.appendingPathComponent("_library.json")
+let rawProcessedMarkerName = "_myrag_done.json"
 let launchAgentURL = FileManager.default.homeDirectoryForCurrentUser
     .appendingPathComponent("Library")
     .appendingPathComponent("LaunchAgents")
@@ -62,6 +63,59 @@ func writeJSON(_ obj: Any, to url: URL) {
     if let data = try? JSONSerialization.data(withJSONObject: obj, options: [.prettyPrinted, .sortedKeys]) {
         try? data.write(to: url)
     }
+}
+
+func normalizedLibraryEntries(_ entries: [[String: Any]]) -> [[String: Any]] {
+    entries.map { entry -> [String: Any] in
+        let relativePath = entry["path"] as? String ?? ""
+        let entryID = entry["id"] as? String ?? ""
+        return [
+            "id": entryID,
+            "type": entry["type"] as? String ?? "",
+            "subtype": entry["subtype"] as? String ?? "",
+            "time": entry["time"] as? String ?? "",
+            "title": entry["title"] as? String ?? "",
+            "summary": entry["summary"] as? String ?? "",
+            "path": relativePath,
+            "llm_context": relativePath.isEmpty ? "" : "\(relativePath)llm_context.md",
+            "processed_path": "processed/\(entryID)/",
+            "role": "raw",
+            "tags": entry["tags"] as? [String] ?? []
+        ]
+    }
+}
+
+func writeCorpusIndexAndLibrary(_ entries: [[String: Any]]) {
+    writeJSON([
+        "updated": nowISO(),
+        "entries": entries
+    ], to: indexURL)
+    writeJSON([
+        "schema": "freerag.library.v1",
+        "updated": nowISO(),
+        "root": corpusRoot.path,
+        "raw_roots": ["screen/", "clipboard/", "voice/"],
+        "processed_root": "processed/",
+        "processed_marker": rawProcessedMarkerName,
+        "entries": normalizedLibraryEntries(entries)
+    ], to: libraryURL)
+}
+
+func rawEntryURL(for entry: [String: Any]) -> URL? {
+    guard let path = entry["path"] as? String, !path.isEmpty else { return nil }
+    return corpusRoot.appendingPathComponent(path)
+}
+
+func entryHasRawProcessedMarker(_ entry: [String: Any]) -> Bool {
+    if let rawURL = rawEntryURL(for: entry),
+       FileManager.default.fileExists(atPath: rawURL.appendingPathComponent(rawProcessedMarkerName).path) {
+        return true
+    }
+    return false
+}
+
+func entryIsMarkedProcessed(_ entry: [String: Any]) -> Bool {
+    entryHasRawProcessedMarker(entry)
 }
 
 func writeLLMContext(title: String, type: String, summary: String, files: [String], to dir: URL) {
@@ -115,44 +169,7 @@ final class CorpusStore {
         }
         var entries = index["entries"] as? [[String: Any]] ?? []
         entries.insert(entry, at: 0)
-        index["entries"] = entries
-        index["updated"] = nowISO()
-        if let data = try? JSONSerialization.data(withJSONObject: index, options: [.prettyPrinted, .sortedKeys]) {
-            let tmp = indexURL.deletingLastPathComponent().appendingPathComponent("_index.json.tmp")
-            try? data.write(to: tmp)
-            _ = try? FileManager.default.replaceItemAt(indexURL, withItemAt: tmp)
-            if !FileManager.default.fileExists(atPath: indexURL.path) {
-                try? data.write(to: indexURL)
-            }
-        }
-        writeLibrary(entries)
-    }
-
-    private func writeLibrary(_ entries: [[String: Any]]) {
-        let normalized = entries.map { entry -> [String: Any] in
-            let relativePath = entry["path"] as? String ?? ""
-            return [
-                "id": entry["id"] as? String ?? "",
-                "type": entry["type"] as? String ?? "",
-                "subtype": entry["subtype"] as? String ?? "",
-                "time": entry["time"] as? String ?? "",
-                "title": entry["title"] as? String ?? "",
-                "summary": entry["summary"] as? String ?? "",
-                "path": relativePath,
-                "llm_context": relativePath.isEmpty ? "" : "\(relativePath)llm_context.md",
-                "processed_path": "processed/\(entry["id"] as? String ?? "")/",
-                "role": "raw",
-                "tags": entry["tags"] as? [String] ?? []
-            ]
-        }
-        writeJSON([
-            "schema": "freerag.library.v1",
-            "updated": nowISO(),
-            "root": corpusRoot.path,
-            "raw_roots": ["screen/", "clipboard/", "voice/"],
-            "processed_root": "processed/",
-            "entries": normalized
-        ], to: libraryURL)
+        writeCorpusIndexAndLibrary(entries)
     }
 
     private func writeCorpusReadme() {
@@ -184,9 +201,20 @@ final class CorpusStore {
         推荐文件：
         - `brief.md`
         - `deep_read.md`
+        - `ocr.md`
+        - `transcript.md`
+        - `timeline.md`
+        - `tables.csv`
         - `facts.json`
         - `citations.md`
         - `open_questions.md`
+
+        ## 已处理标记
+        MyRAG 确认某条原材料已经沉淀到 `processed/<entry_id>/` 后，应给原材料目录写入：
+
+        `screen|clipboard|voice/<entry_id>/_myrag_done.json`
+
+        FreeRAG 原材料库里的“一键清理已处理过语料”只会清理带这个标记的原材料目录，不会删除 `processed/` 里的沉淀结果。
 
         FreeRAG 本身只做低成本原材料收集。Codex/Claude Code 的 MyRAG skill 负责多视角深读、OCR、转写、抽取、综合和长期沉淀。
         """
@@ -1212,6 +1240,11 @@ final class SettingsWindow: NSWindowController {
         hint.alignment = .right
         hint.frame = NSRect(x: 286, y: 27, width: 218, height: 20)
         content.addSubview(hint)
+
+        let signature = label("八路出品 凑合能用", size: 10, weight: .regular, color: .tertiaryLabelColor)
+        signature.alignment = .center
+        signature.frame = NSRect(x: 200, y: 4, width: 220, height: 14)
+        content.addSubview(signature)
     }
 
     private func addPermissionRow(y: CGFloat, title: String, detail: String, badge: StatusBadge, buttonTitle: String, action: Selector, in content: NSView) {
@@ -1358,7 +1391,8 @@ final class LibraryWindow: NSWindowController, NSTableViewDataSource, NSTableVie
         table.usesAlternatingRowBackgroundColors = false
         addColumn("time", width: 132)
         addColumn("type", width: 62)
-        addColumn("title", width: 246)
+        addColumn("state", width: 54)
+        addColumn("title", width: 212)
 
         let tableScroll = NSScrollView(frame: NSRect(x: 28, y: 78, width: 460, height: 338))
         tableScroll.documentView = table
@@ -1383,6 +1417,11 @@ final class LibraryWindow: NSWindowController, NSTableViewDataSource, NSTableVie
         refresh.frame = NSRect(x: 28, y: 28, width: 82, height: 30)
         content.addSubview(refresh)
 
+        let cleanProcessed = NSButton(title: "清理已处理", target: self, action: #selector(cleanProcessedAction))
+        cleanProcessed.bezelStyle = .rounded
+        cleanProcessed.frame = NSRect(x: 124, y: 28, width: 108, height: 30)
+        content.addSubview(cleanProcessed)
+
         let openItem = NSButton(title: "打开条目", target: self, action: #selector(openSelected))
         openItem.bezelStyle = .rounded
         openItem.frame = NSRect(x: 590, y: 28, width: 92, height: 30)
@@ -1403,6 +1442,7 @@ final class LibraryWindow: NSWindowController, NSTableViewDataSource, NSTableVie
     @objc func refreshAction() { refresh() }
     @objc func filterChanged() { applyFilter() }
     @objc func searchChanged() { applyFilter() }
+    @objc func cleanProcessedAction() { cleanProcessedRawEntries() }
 
     func controlTextDidChange(_ obj: Notification) {
         applyFilter()
@@ -1448,7 +1488,8 @@ final class LibraryWindow: NSWindowController, NSTableViewDataSource, NSTableVie
             return haystack.contains(q)
         }
         table.reloadData()
-        countLabel.stringValue = "\(visible.count) / \(entries.count) 条"
+        let doneCount = entries.filter { entryIsMarkedProcessed($0) }.count
+        countLabel.stringValue = doneCount > 0 ? "\(visible.count) / \(entries.count) 条，已处理 \(doneCount)" : "\(visible.count) / \(entries.count) 条"
         if visible.isEmpty {
             detail.string = "还没有匹配的原材料。"
         } else if table.selectedRow < 0 {
@@ -1482,6 +1523,8 @@ final class LibraryWindow: NSWindowController, NSTableViewDataSource, NSTableVie
             case "voice": return "语音"
             default: return entry["type"] as? String ?? ""
             }
+        case "state":
+            return entryIsMarkedProcessed(entry) ? "已处理" : ""
         default:
             let title = entry["title"] as? String ?? ""
             if !title.isEmpty { return title }
@@ -1522,6 +1565,7 @@ final class LibraryWindow: NSWindowController, NSTableViewDataSource, NSTableVie
         类型: \(displayValue(for: entry, column: "type"))
         时间: \(entry["time"] as? String ?? "")
         路径: \(path)
+        状态: \(entryIsMarkedProcessed(entry) ? "已处理，可清理原材料" : "未处理")
         建议处理输出: processed/\(entry["id"] as? String ?? "")/
 
         摘要:
@@ -1546,6 +1590,64 @@ final class LibraryWindow: NSWindowController, NSTableViewDataSource, NSTableVie
         } else {
             NSWorkspace.shared.open(corpusRoot)
         }
+    }
+
+    private func currentIndexEntries() -> [[String: Any]] {
+        if let data = try? Data(contentsOf: indexURL),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let indexEntries = json["entries"] as? [[String: Any]],
+           !indexEntries.isEmpty {
+            return indexEntries
+        }
+        return entries
+    }
+
+    private func cleanProcessedRawEntries() {
+        let sourceEntries = currentIndexEntries()
+        let removable = sourceEntries.filter { entry in
+            guard rawEntryURL(for: entry) != nil else { return false }
+            return entryHasRawProcessedMarker(entry)
+        }
+        guard !removable.isEmpty else {
+            let alert = NSAlert()
+            alert.messageText = "没有可清理的已处理语料"
+            alert.informativeText = "MyRAG 完成处理后会写入 \(rawProcessedMarkerName)，FreeRAG 只清理带标记的原材料。"
+            alert.runModal()
+            return
+        }
+
+        let alert = NSAlert()
+        alert.messageText = "清理已处理过的原材料？"
+        alert.informativeText = "将删除 \(removable.count) 个带 \(rawProcessedMarkerName) 标记的 screen/clipboard/voice 原材料目录；processed/ 里的沉淀结果会保留。"
+        alert.addButton(withTitle: "清理")
+        alert.addButton(withTitle: "取消")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+        let removableIDs = Set(removable.compactMap { $0["id"] as? String })
+        let fm = FileManager.default
+        var removed = 0
+        for entry in removable {
+            if let url = rawEntryURL(for: entry), fm.fileExists(atPath: url.path) {
+                do {
+                    try fm.removeItem(at: url)
+                    removed += 1
+                } catch {
+                    NSLog("FreeRAG failed to remove processed raw entry %@: %@", url.path, String(describing: error))
+                }
+            }
+        }
+
+        let remaining = sourceEntries.filter { entry in
+            guard let id = entry["id"] as? String else { return true }
+            return !removableIDs.contains(id)
+        }
+        writeCorpusIndexAndLibrary(remaining)
+        refresh()
+
+        let done = NSAlert()
+        done.messageText = "已清理 \(removed) 个原材料目录"
+        done.informativeText = "处理结果仍保留在 ~/Documents/Corpus/processed/。"
+        done.runModal()
     }
 }
 
@@ -1575,13 +1677,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     func setupMenu() {
         status = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         let image: NSImage?
-        if let iconURL = Bundle.main.url(forResource: "AppIcon", withExtension: "icns") {
+        if let iconURL = Bundle.main.url(forResource: "StatusIcon", withExtension: "png") {
             image = NSImage(contentsOf: iconURL)
         } else {
             image = NSImage(systemSymbolName: "square.stack.3d.down.right", accessibilityDescription: "FreeRAG")
         }
         image?.size = NSSize(width: 18, height: 18)
-        image?.isTemplate = false
+        image?.isTemplate = true
         status.button?.image = image
         status.button?.toolTip = "FreeRAG 正在收集剪贴板语料"
         let menu = NSMenu()
