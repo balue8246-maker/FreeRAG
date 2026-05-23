@@ -129,7 +129,7 @@ func writeLLMContext(title: String, type: String, summary: String, files: [Strin
     类型: \(type)
     时间: \(nowISO())
     原材料路径: \(dir.path)
-    建议处理目录: \(processedPath)
+    可选处理目录: \(processedPath)
 
     ## 摘要
     \(summary)
@@ -143,7 +143,9 @@ func writeLLMContext(title: String, type: String, summary: String, files: [Strin
 
     处理这个条目时，建议先判断问题场景，再用多个视角逐轮阅读，例如事实、时间、关系、意图、结构、细节、偏好、矛盾、模式、行动和可复用规则。
 
-    如果整理出可复用结果，请写入 `~/Documents/Corpus/\(processedPath)`，推荐文件：
+    MyRAG 默认应先在 Codex / ClaudeCode 对话里输出“事项汇总 + 证据 + 下一步”，由用户确认后再决定是否写回处理层、并入项目或标记 raw 可清理。
+
+    如果用户确认要保存单条处理结果，可写入 `~/Documents/Corpus/\(processedPath)`，推荐文件：
     - `brief.md`：中文摘要、关键结论、可引用事实
     - `deep_read.md`：多视角深读记录
     - `facts.json`：结构化事实、实体、数值、时间线、行动项
@@ -194,7 +196,14 @@ final class CorpusStore {
         - 图片、音频、Markdown 等原始文件
 
         ## 处理结果
-        LLM 工具应该把可复用的抽取、整理、转写、OCR、综合结果写入：
+        MyRAG 默认先在 Codex / ClaudeCode 对话里输出“事项汇总 + 证据 + 下一步”，让用户判断。用户确认需要保存后，再把可复用的抽取、整理、转写、OCR、综合结果写入处理层。
+
+        优先使用：
+
+        `processed/_worklogs/`
+        `processed/_batches/<batch_id>/`
+
+        单条或项目级材料确有长期价值时，再使用：
 
         `processed/<entry_id>/`
 
@@ -210,7 +219,7 @@ final class CorpusStore {
         - `open_questions.md`
 
         ## 已处理标记
-        MyRAG 确认某条原材料已经沉淀到 `processed/<entry_id>/` 后，应给原材料目录写入：
+        MyRAG 已经在对话中完成抽离、用户确认 raw 已接盘后，应给原材料目录写入：
 
         `screen|clipboard|voice/<entry_id>/_myrag_done.json`
 
@@ -1488,8 +1497,12 @@ final class LibraryWindow: NSWindowController, NSTableViewDataSource, NSTableVie
             return haystack.contains(q)
         }
         table.reloadData()
-        let doneCount = entries.filter { entryIsMarkedProcessed($0) }.count
-        countLabel.stringValue = doneCount > 0 ? "\(visible.count) / \(entries.count) 条，已处理 \(doneCount)" : "\(visible.count) / \(entries.count) 条"
+        let doneRawPaths = Set(entries.compactMap { entry -> String? in
+            guard entryIsMarkedProcessed(entry), let url = rawEntryURL(for: entry) else { return nil }
+            return url.standardizedFileURL.path
+        })
+        let doneCount = doneRawPaths.count
+        countLabel.stringValue = doneCount > 0 ? "\(visible.count) / \(entries.count) 条，已处理目录 \(doneCount)" : "\(visible.count) / \(entries.count) 条"
         if visible.isEmpty {
             detail.string = "还没有匹配的原材料。"
         } else if table.selectedRow < 0 {
@@ -1566,7 +1579,7 @@ final class LibraryWindow: NSWindowController, NSTableViewDataSource, NSTableVie
         时间: \(entry["time"] as? String ?? "")
         路径: \(path)
         状态: \(entryIsMarkedProcessed(entry) ? "已处理，可清理原材料" : "未处理")
-        建议处理输出: processed/\(entry["id"] as? String ?? "")/
+        可选处理输出: processed/\(entry["id"] as? String ?? "")/
 
         摘要:
         \(entry["summary"] as? String ?? "")
@@ -1604,11 +1617,18 @@ final class LibraryWindow: NSWindowController, NSTableViewDataSource, NSTableVie
 
     private func cleanProcessedRawEntries() {
         let sourceEntries = currentIndexEntries()
-        let removable = sourceEntries.filter { entry in
+        let removableEntries = sourceEntries.filter { entry in
             guard rawEntryURL(for: entry) != nil else { return false }
             return entryHasRawProcessedMarker(entry)
         }
-        guard !removable.isEmpty else {
+        var removableByPath: [String: URL] = [:]
+        for entry in removableEntries {
+            if let url = rawEntryURL(for: entry) {
+                removableByPath[url.standardizedFileURL.path] = url
+            }
+        }
+        let removablePaths = Set(removableByPath.keys)
+        guard !removablePaths.isEmpty else {
             let alert = NSAlert()
             alert.messageText = "没有可清理的已处理语料"
             alert.informativeText = "MyRAG 完成处理后会写入 \(rawProcessedMarkerName)，FreeRAG 只清理带标记的原材料。"
@@ -1616,37 +1636,41 @@ final class LibraryWindow: NSWindowController, NSTableViewDataSource, NSTableVie
             return
         }
 
+        let duplicateIndexRows = max(0, removableEntries.count - removablePaths.count)
+        let duplicateNote = duplicateIndexRows > 0
+            ? "\n\n索引里另有 \(duplicateIndexRows) 行重复记录指向这些目录，也会一起从索引移除。"
+            : ""
         let alert = NSAlert()
         alert.messageText = "清理已处理过的原材料？"
-        alert.informativeText = "将删除 \(removable.count) 个带 \(rawProcessedMarkerName) 标记的 screen/clipboard/voice 原材料目录；processed/ 里的沉淀结果会保留。"
+        alert.informativeText = "将删除 \(removablePaths.count) 个带 \(rawProcessedMarkerName) 标记的唯一 screen/clipboard/voice 原材料目录；processed/ 里的沉淀结果会保留。\(duplicateNote)"
         alert.addButton(withTitle: "清理")
         alert.addButton(withTitle: "取消")
         guard alert.runModal() == .alertFirstButtonReturn else { return }
 
-        let removableIDs = Set(removable.compactMap { $0["id"] as? String })
         let fm = FileManager.default
         var removed = 0
-        for entry in removable {
-            if let url = rawEntryURL(for: entry), fm.fileExists(atPath: url.path) {
-                do {
-                    try fm.removeItem(at: url)
-                    removed += 1
-                } catch {
-                    NSLog("FreeRAG failed to remove processed raw entry %@: %@", url.path, String(describing: error))
-                }
+        for path in removablePaths.sorted() {
+            guard let url = removableByPath[path], fm.fileExists(atPath: url.path) else { continue }
+            do {
+                try fm.removeItem(at: url)
+                removed += 1
+            } catch {
+                NSLog("FreeRAG failed to remove processed raw entry %@: %@", url.path, String(describing: error))
             }
         }
 
         let remaining = sourceEntries.filter { entry in
-            guard let id = entry["id"] as? String else { return true }
-            return !removableIDs.contains(id)
+            guard let url = rawEntryURL(for: entry) else { return true }
+            return !removablePaths.contains(url.standardizedFileURL.path)
         }
         writeCorpusIndexAndLibrary(remaining)
         refresh()
 
         let done = NSAlert()
         done.messageText = "已清理 \(removed) 个原材料目录"
-        done.informativeText = "处理结果仍保留在 ~/Documents/Corpus/processed/。"
+        done.informativeText = duplicateIndexRows > 0
+            ? "已同时从索引移除 \(duplicateIndexRows) 行重复记录。处理结果仍保留在 ~/Documents/Corpus/processed/。"
+            : "处理结果仍保留在 ~/Documents/Corpus/processed/。"
         done.runModal()
     }
 }

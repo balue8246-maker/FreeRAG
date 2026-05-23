@@ -159,9 +159,9 @@ shared/skills/myrag/scripts/myrag_search.py
 8. 证据校准。
 9. 反方攻击。
 10. 交叉合并。
-11. 写回 processed。
-12. 回答用户。
-13. 收束出口。
+11. 在当前 Codex / ClaudeCode 对话里输出一事项一行的 summary 表格；表格必须有横向分行线。
+12. 等用户判断下一步。
+13. 用户确认后，才写回 processed、并入项目或标记 raw 可清理。
 
 三种收束出口：
 
@@ -174,7 +174,7 @@ shared/skills/myrag/scripts/myrag_search.py
 - `--suggest-projects` 不能过滤 `FreeRAG` / `LLM` / `RAG` 这类真实领域词。
 - 应该过滤的是协议/运营层生成物和字段名，例如 `_meta.json`、`llm_context.md`、`_index.json`、`_library.json`、`README_FOR_LLM.md`、`type/time/files/json/meta` 等。
 - 归拢读取用户材料本身：`content.md`、`transcript.md`、`captures.json`、storyboard 文件线索。
-- 处理完成后使用 `--mark-processed <entry_id>` 写入 raw 目录的 `_myrag_done.json` 和 `processed/<entry_id>/_myrag_status.json`。
+- 用户看过事项 summary 并确认 raw 已接盘后，使用 `--mark-processed <entry_id>` 写入 raw 目录的 `_myrag_done.json`。
 - FreeRAG 的一键清理只删除带 `_myrag_done.json` 的 raw 目录，不删除 `processed/`。
 
 常用命令：
@@ -185,7 +185,8 @@ python3 shared/skills/myrag/scripts/myrag_search.py --suggest-projects 40 --form
 python3 shared/skills/myrag/scripts/myrag_search.py "<查询>" --format text --deep-plan
 python3 shared/skills/myrag/scripts/myrag_search.py --entry "<entry_id>" --format text
 python3 shared/skills/myrag/scripts/myrag_search.py --init-processed "<entry_id>"
-python3 shared/skills/myrag/scripts/myrag_search.py --mark-processed "<entry_id>" --note "已完成深挖并写回 processed"
+python3 shared/skills/myrag/scripts/myrag_search.py --goldmine-candidates 80
+python3 shared/skills/myrag/scripts/myrag_search.py --mark-processed "<entry_id>" --note "用户已确认 summary，raw 已接盘"
 ```
 
 ## 当前语料协议
@@ -209,9 +210,11 @@ python3 shared/skills/myrag/scripts/myrag_search.py --mark-processed "<entry_id>
   processed/
 ```
 
-推荐 processed：
+推荐 processed（用户确认保存后才写）：
 
 ```text
+processed/_worklogs/
+processed/_batches/<batch_id>/
 processed/<entry_id>/
   brief.md
   deep_read.md
@@ -362,8 +365,8 @@ MyRAG 对烂语料的正确处理策略：
 1. 先跑 `--image-clusters`，把大量完全重复剪贴板图折叠成少量代表簇。
 2. 对每个大簇只保留 1 个代表样本进入视觉/OCR 子 agent。
 3. 子 agent 输出 `ocr.md` 草案、`visual_observations.md` 草案、`tables.csv` 草案和 skip/process/optional 决策。
-4. 主会话统一汇总、证据校准、写回 `processed/<entry_id>/`。
-5. 只有写回完成并确认可复用后，主会话再运行 `--mark-processed` 写 `_myrag_done.json`；FreeRAG 只负责之后的一键 raw 清理。
+4. 主会话统一汇总、证据校准，在聊天窗输出一事项一行、带横向分行线的 summary 表格。
+5. 用户确认保存或 raw 已接盘后，主会话再写 processed 或运行 `--mark-processed` 写 `_myrag_done.json`；FreeRAG 只负责之后的一键 raw 清理。
 
 本次真实语料代表图初步 processed 建议：
 
@@ -371,17 +374,16 @@ MyRAG 对烂语料的正确处理策略：
 - 可选保留：控制条不同灰态/深色态。
 - 建议跳过：单图标裁切、状态栏裁切、空白条、WatermarkWidget 文档占位图。
 
-开发工具权限说明：
+开发工具路径说明：
 
-- 当前项目已迁移到 `/Users/acegent/Documents/GPT Projects/GPT assistant/FreeRAG`。
-- 本次会话的工具沙箱可写根仍是旧路径 `/Users/acegent/Documents/GPT Projects/GPT assistant/rag collector`，所以读写新仓库文件会反复要求提权。
-- 这不是 FreeRAG app 的 macOS 权限问题，也不是版本号更新导致用户权限重开。
-- 下一次新会话如果 cwd/writable root 直接在 FreeRAG 新路径下，开发工具不应继续反复要这个文件写入权限。
+- 当前项目路径：`/Users/acegent/Documents/GPT Projects/FreeRAG`。
+- 旧的 `GPT assistant/FreeRAG` 路径已不作为当前仓库使用。
+- 如果开发工具反复要求文件写入权限，先确认 cwd 和 writable root 是否指向当前仓库；这不是 FreeRAG app 的 macOS 权限问题。
 
 下一会话建议第一步：
 
 ```bash
-cd "/Users/acegent/Documents/GPT Projects/GPT assistant/FreeRAG"
+cd "/Users/acegent/Documents/GPT Projects/FreeRAG"
 git status --short
 python3 shared/skills/myrag/scripts/myrag_search.py --image-clusters 20
 ```

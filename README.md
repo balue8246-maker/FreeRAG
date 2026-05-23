@@ -1,6 +1,6 @@
 # FreeRAG
 
-FreeRAG 是一个原生 macOS 本地语料收集工具。它负责低成本收集屏幕、剪贴板和语音原材料，并把它们写入 `~/Documents/Corpus/`，供 MyRAG skill 后续检索、深挖和沉淀。
+FreeRAG 是一个原生 macOS 本地语料收集工具。它负责低成本收集屏幕、剪贴板和语音原材料，并把它们写入 `~/Documents/Corpus/`。MyRAG skill 在 Codex / Claude Code 聊天里读取这些有限语料，多视角深挖后按事项汇总给用户判断。
 
 ## 当前结构
 
@@ -30,9 +30,9 @@ dist/FreeRAG.app
 
 ## 产品边界
 
-FreeRAG app 只做本地原材料收集，不自动 OCR、不自动转写、不自动联网分析。MyRAG skill 负责读取本地语料，处理图片/屏幕/音频信息，产出 OCR、转写、timeline、CSV 表格、多视角深挖和证据校准结果，并写回 `processed/<entry_id>/`。
+FreeRAG app 只做本地原材料收集，不自动 OCR、不自动转写、不自动联网分析。MyRAG skill 负责读取本地语料，处理图片/屏幕/音频信息，做 OCR、转写、timeline、CSV 表格、多视角深挖和证据校准，并先在当前聊天窗输出一事项一行、带横向分行线的 summary 表格。
 
-MyRAG 确认某条原材料已经处理完成后，会写入 `_myrag_done.json` 标记。FreeRAG 原材料库里的“一键清理已处理过语料”只清理带标记的 raw 目录，并保留 `processed/` 里的沉淀结果。
+用户看过 summary 并确认 raw 已经接盘后，MyRAG 才写入 `_myrag_done.json` 标记。FreeRAG 原材料库里的“一键清理已处理过语料”只清理带标记的唯一 raw 目录，并保留 `processed/` 里的可选沉淀结果。
 
 对大量剪贴板图片，MyRAG 先用 `python3 shared/skills/myrag/scripts/myrag_search.py --image-clusters 40` 按 SHA-256 精确折叠重复图，再把代表样本交给视觉/OCR 子 agent。
 

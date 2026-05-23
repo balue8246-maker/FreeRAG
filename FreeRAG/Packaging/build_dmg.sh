@@ -35,6 +35,9 @@ Install:
 3. Launch FreeRAG from Applications so macOS permissions stay tied to a stable app location.
 4. Copy Copy MyRAG skill to Codex-Claude/myrag into your Codex/Claude Code skill directory when needed.
 
+MyRAG:
+FreeRAG collects raw local material. MyRAG reads it in Codex/Claude Code, summarizes by matter/item in the chat, and only marks raw as done after the user confirms the summary.
+
 Permissions:
 macOS permissions are tied mainly to bundle id, signing identity, and app location.
 Changing only CFBundleShortVersionString/CFBundleVersion should not require re-authorizing.

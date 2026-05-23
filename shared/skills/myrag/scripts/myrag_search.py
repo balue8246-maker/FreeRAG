@@ -7,8 +7,12 @@ import argparse
 import hashlib
 import io
 import json
+import os
+import shlex
+import shutil
 import subprocess
 import sys
+from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
@@ -20,7 +24,6 @@ LIBRARY = CORPUS / "_library.json"
 PROCESSED = CORPUS / "processed"
 RAW_PROCESSED_MARKER = "_myrag_done.json"
 PROCESSED_STATUS = "_myrag_status.json"
-KIMI = str(Path.home() / ".claude" / "tools" / "kimi.js")
 
 DEEP_LENSES = [
     ("L01 原始事实镜头", "材料明确出现了什么；原话、画面、数值、文件、链接是什么。"),
@@ -111,11 +114,19 @@ def processed_status_path(entry_id: str) -> Path:
     return processed_dir(entry_id) / PROCESSED_STATUS
 
 
-def is_marked_processed(entry: dict) -> bool:
+def has_raw_done_marker(entry: dict) -> bool:
     entry_id = str(entry.get("id", ""))
     if not entry_id:
         return False
-    return raw_processed_marker(entry).exists() or processed_status_path(entry_id).exists()
+    return raw_processed_marker(entry).exists()
+
+
+def has_processed_status(entry_id: str) -> bool:
+    return bool(entry_id) and processed_status_path(entry_id).exists()
+
+
+def is_marked_processed(entry: dict) -> bool:
+    return has_raw_done_marker(entry)
 
 
 def read_processed(entry_id: str) -> str:
@@ -205,6 +216,7 @@ def build_result(entry: dict, score: int, content: str) -> dict:
         "path": entry.get("path", ""),
         "processed_path": processed_path,
         "has_processed": processed_dir(entry_id).exists(),
+        "has_processed_status": has_processed_status(entry_id),
         "is_marked_processed": is_marked_processed(entry),
         "content": content[:16000],
     }
@@ -325,6 +337,101 @@ def image_clusters(limit: int = 40) -> list[dict]:
         output.append(cluster)
     output.sort(key=lambda item: (-int(item["count"]), str(item["sample_entry"])))
     return output[:limit]
+
+
+def goldmine_candidates(limit: int = 80, image_limit: int = 30) -> dict:
+    entries, source = load_index()
+    unique_entries = unique_raw_entries(entries)
+    clusters_by_digest, digest_by_path = build_image_cluster_index(entries)
+    image_clusters_payload = [
+        image_cluster_payload(cluster)
+        for cluster in sorted(
+            clusters_by_digest.values(),
+            key=lambda item: (-int(item["count"]), str(item["sample_entry"])),
+        )[:image_limit]
+    ]
+
+    materials = []
+    for entry in unique_entries[:limit]:
+        entry_type = str(entry.get("type", ""))
+        subtype = str(entry.get("subtype", ""))
+        rel_path = str(entry.get("path", ""))
+        root = entry_dir(entry)
+        item = {
+            "id": str(entry.get("id", "")),
+            "type": entry_type,
+            "subtype": subtype,
+            "time": entry.get("time", ""),
+            "title": entry.get("title", ""),
+            "summary": entry.get("summary", ""),
+            "path": rel_path,
+            "signals": extract_signals(read_project_material(entry), entry),
+            "why_read": "",
+            "evidence_files": [],
+            "preview": "",
+        }
+        if entry_type == "clipboard" and subtype == "text":
+            item["why_read"] = "剪贴板文字，可能包含用户原话、路径、业务判断或待办。"
+            item["preview"] = read_text(root / "content.md", 2000)
+            item["evidence_files"] = ["content.md"]
+        elif entry_type == "clipboard" and subtype == "image":
+            digest = digest_by_path.get(rel_path, "")
+            cluster = clusters_by_digest.get(digest) if digest else None
+            if cluster and cluster["sample_entry"] != item["id"]:
+                item["why_read"] = f"重复图片，语义复用代表图 {cluster['sample_entry']}。"
+                item["preview"] = f"duplicate sha256={digest}, count={cluster['count']}"
+            else:
+                item["why_read"] = "图片代表样本，需要视觉读取/OCR。"
+                item["preview"] = f"image.png sha256={digest} dimensions={cluster['dimensions'] if cluster else ''}"
+                item["evidence_files"] = ["image.png"]
+        elif entry_type == "screen":
+            item["why_read"] = "屏幕 storyboard，可能包含聊天过程、后台页面、文档浏览或操作链路。"
+            item["preview"] = read_text(root / "captures.json", 2000)
+            if (root / "stitched").exists():
+                item["evidence_files"] = [f"stitched/{p.name}" for p in sorted((root / "stitched").glob("storyboard_*.png"))[:6]]
+        elif entry_type == "voice":
+            item["why_read"] = "录音，需要转写后再抽意图、约束和行动项。"
+            transcript = read_text(root / "transcript.md", 2000)
+            item["preview"] = transcript
+            item["evidence_files"] = ["recording.wav", "transcript.md"]
+        else:
+            item["why_read"] = "未知类型，作为候选材料保留。"
+            item["preview"] = read_project_material(entry)[:2000]
+        materials.append(item)
+
+    return {
+        "语料索引": source,
+        "library_entry_count": len(entries),
+        "unique_raw_entry_count": len(unique_entries),
+        "image_cluster_count": len(clusters_by_digest),
+        "image_clusters": image_clusters_payload,
+        "materials": materials,
+        "淘金要求": {
+            "默认交付": "在当前对话里输出表格化内容 summary，按信息密度/行动价值/紧急程度排序，不要只输出分类或数量。",
+            "必须抽取": ["关键事实/数字", "人物/项目/业务线", "判断/决策/偏好", "待办/下一步动作", "风险/不确定", "可复用方法论/SOP", "低价值噪音"],
+            "主表": {
+                "名称": "事项汇总表",
+                "规则": "一个事项一行；事实、数字、人物、判断、风险、待办、方法论和证据必须合并到同一事项行。",
+                "字段": ["优先级", "事项", "抽出的核心内容", "关键事实/数字", "人物/项目", "判断/风险", "建议下一步", "证据", "置信度"],
+            },
+            "辅助表": ["噪音/低价值表"],
+            "表格边界": "表格必须有横向分行线；如果 Markdown 渲染只显示竖线，改用带边框的 HTML table 或在记录之间加入清晰分隔行。",
+            "建议并发镜头": [
+                "原始事实/数字",
+                "人物/项目关系",
+                "意图/需求",
+                "决策/取舍",
+                "行动/机会",
+                "风险/矛盾/缺口",
+                "模式/复用/SOP",
+                "情绪/偏好/审美",
+                "噪音/去重",
+                "反方攻击",
+            ],
+            "合并规则": "多镜头是阅读方法，最终必须按事项汇总，一事项一行。",
+            "标记清理": "只有用户看过 summary 并确认 raw 已接盘后，才写 _myrag_done.json。",
+        },
+    }
 
 def read_project_material(entry: dict) -> str:
     root = entry_dir(entry)
@@ -475,14 +582,447 @@ def mark_processed(entry_id: str, note: str = "") -> dict:
     return {"条目id": entry_id, "状态": "已标记处理完成", "写入": written}
 
 
+def unique_raw_entries(entries: list[dict]) -> list[dict]:
+    seen = set()
+    output = []
+    for entry in entries:
+        key = str(entry.get("path") or entry.get("id") or "")
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        output.append(entry)
+    return output
+
+
+def build_image_cluster_index(entries: list[dict]) -> tuple[dict[str, dict], dict[str, str]]:
+    clusters: dict[str, dict] = {}
+    path_to_digest: dict[str, str] = {}
+    for entry in entries:
+        if entry.get("type") != "clipboard" or entry.get("subtype") != "image":
+            continue
+        rel_path = str(entry.get("path", ""))
+        path = entry_dir(entry) / "image.png"
+        if not path.exists():
+            continue
+        try:
+            digest = image_hash(path)
+            dimensions = image_dimensions(path)
+            byte_count = path.stat().st_size
+        except OSError:
+            continue
+        path_to_digest[rel_path] = digest
+        cluster = clusters.setdefault(digest, {
+            "sha256": digest,
+            "count": 0,
+            "unique_raw_paths": set(),
+            "sample_entry": str(entry.get("id", "")),
+            "sample_path": str(path.relative_to(CORPUS)),
+            "sample_title": str(entry.get("title", "")),
+            "dimensions": dimensions,
+            "bytes": byte_count,
+            "titles": Counter(),
+            "entries": [],
+        })
+        cluster["count"] += 1
+        cluster["unique_raw_paths"].add(rel_path)
+        cluster["titles"][str(entry.get("title", ""))] += 1
+        if len(cluster["entries"]) < 30:
+            cluster["entries"].append(str(entry.get("id", "")))
+    return clusters, path_to_digest
+
+
+def image_cluster_payload(cluster: dict) -> dict:
+    return {
+        "sha256": cluster["sha256"],
+        "count": cluster["count"],
+        "unique_raw_path_count": len(cluster["unique_raw_paths"]),
+        "sample_entry": cluster["sample_entry"],
+        "sample_path": cluster["sample_path"],
+        "sample_title": cluster["sample_title"],
+        "dimensions": cluster["dimensions"],
+        "bytes": cluster["bytes"],
+        "titles": [
+            {"title": title, "count": count}
+            for title, count in cluster["titles"].most_common(12)
+        ],
+        "entries_sample": cluster["entries"],
+    }
+
+
+def write_processed_marker_for_entry(entry: dict, note: str) -> list[str]:
+    entry_id = str(entry.get("id", ""))
+    raw_root = entry_dir(entry)
+    processed_root = processed_dir(entry_id)
+    processed_root.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "schema": "myrag.raw_processed_marker.v1",
+        "entry_id": entry_id,
+        "status": "processed",
+        "marked_at": datetime.now().isoformat(timespec="seconds"),
+        "raw_path": str(raw_root),
+        "processed_path": str(processed_root),
+        "marker_for": "FreeRAG 一键清理已处理过语料",
+        "status_file_for": "MyRAG 自己记录处理状态，FreeRAG 不读取 processed 状态",
+        "note": note,
+    }
+    written = []
+    if raw_root.exists():
+        raw_marker = raw_root / RAW_PROCESSED_MARKER
+        raw_marker.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        written.append(str(raw_marker))
+    status = processed_root / PROCESSED_STATUS
+    status.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    written.append(str(status))
+    return written
+
+
+def write_processed_file(root: Path, name: str, body: str) -> None:
+    root.mkdir(parents=True, exist_ok=True)
+    (root / name).write_text(body.rstrip() + "\n", encoding="utf-8")
+
+
+def copy_if_exists(src: Path, dst: Path) -> bool:
+    if not src.exists():
+        return False
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(src, dst)
+    return True
+
+
+def configured_ocr_command(img_path: str, prompt: str) -> list[str]:
+    """Return an optional OCR command without embedding machine-specific paths."""
+    template = os.environ.get("MYRAG_OCR_COMMAND", "").strip()
+    if template:
+        return [
+            part.replace("{image}", img_path).replace("{prompt}", prompt)
+            for part in shlex.split(template)
+        ]
+    kimi = shutil.which("kimi")
+    if kimi:
+        return [kimi, "--image", img_path, "--prompt", prompt]
+    kimi_js = shutil.which("kimi.js")
+    if kimi_js:
+        return ["node", kimi_js, "--image", img_path, "--prompt", prompt]
+    return []
+
+
+def pending_voice_needs_transcript(entry: dict) -> bool:
+    if entry.get("type") != "voice":
+        return False
+    transcript = read_text(entry_dir(entry) / "transcript.md", 4000)
+    return not transcript.strip() or "待转译" in transcript
+
+
+def process_entry(
+    entry: dict,
+    image_clusters_by_digest: dict[str, dict],
+    image_digest_by_path: dict[str, str],
+    batch_id: str,
+    batch_root: Path,
+) -> dict:
+    entry_id = str(entry.get("id", ""))
+    entry_type = str(entry.get("type", ""))
+    subtype = str(entry.get("subtype", ""))
+    rel_path = str(entry.get("path", ""))
+    root = processed_dir(entry_id)
+    title = str(entry.get("title") or entry.get("summary") or entry_id)
+    digest = image_digest_by_path.get(rel_path, "")
+    cluster = image_clusters_by_digest.get(digest) if digest else None
+    is_representative = bool(cluster and cluster["sample_entry"] == entry_id)
+    duplicate_note = ""
+    if cluster:
+        duplicate_note = (
+            f"此图片属于 SHA-256 精确重复簇 `{digest}`，"
+            f"索引出现 {cluster['count']} 次，唯一 raw 路径 {len(cluster['unique_raw_paths'])} 个。"
+        )
+    preserved_files = []
+    raw_root = entry_dir(entry)
+
+    brief_lines = [
+        f"# {title}",
+        "",
+        "## 处理结论",
+        f"- 条目 ID: `{entry_id}`",
+        f"- 类型: `{entry_type}/{subtype}`",
+        f"- 原材料路径: `~/Documents/Corpus/{rel_path}`",
+        f"- 批处理: `{batch_id}`",
+    ]
+    if duplicate_note:
+        brief_lines.append(f"- 去重结论: {duplicate_note}")
+    if entry_type == "clipboard" and subtype == "text":
+        content = read_text(entry_dir(entry) / "content.md", 12000).strip()
+        brief_lines.extend([
+            "- 抽离内容: 剪贴板文字已保留为文本证据。",
+            "",
+            "## 原文",
+            content or "空文本或读取失败。",
+        ])
+    elif entry_type == "clipboard" and subtype == "image":
+        if is_representative:
+            brief_lines.append("- 抽离内容: 此条目是重复簇代表图，保留为视觉/OCR 入口。")
+        else:
+            sample = cluster["sample_entry"] if cluster else ""
+            brief_lines.append(f"- 抽离内容: 此条目是重复图片，语义处理复用代表条目 `{sample}`。")
+        if cluster:
+            sample_src = CORPUS / str(cluster["sample_path"])
+            cluster_image = batch_root / "image_clusters" / f"{digest}.png"
+            if copy_if_exists(sample_src, cluster_image):
+                preserved_files.append(str(cluster_image.relative_to(PROCESSED)))
+            if is_representative and copy_if_exists(sample_src, root / "image.png"):
+                preserved_files.append(f"{entry_id}/image.png")
+    elif entry_type == "screen":
+        brief_lines.append("- 抽离内容: 屏幕 storyboard 已保留为时间线证据。")
+        stitched = raw_root / "stitched"
+        if stitched.exists():
+            for png in sorted(stitched.glob("storyboard_*.png")):
+                dst = root / "storyboards" / png.name
+                if copy_if_exists(png, dst):
+                    preserved_files.append(f"{entry_id}/storyboards/{png.name}")
+    elif entry_type == "voice":
+        if pending_voice_needs_transcript(entry):
+            brief_lines.append("- 抽离内容: 录音文件有效，但 transcript 仍为待转译；本地未配置可用语音转写后端。")
+        else:
+            brief_lines.append("- 抽离内容: 录音 transcript 已保留。")
+        if copy_if_exists(raw_root / "recording.wav", root / "recording.wav"):
+            preserved_files.append(f"{entry_id}/recording.wav")
+    else:
+        brief_lines.append("- 抽离内容: 已按 raw 条目保留索引和引用。")
+
+    facts = {
+        "条目id": entry_id,
+        "类型": entry_type,
+        "子类型": subtype,
+        "时间": entry.get("time", ""),
+        "标题": entry.get("title", ""),
+        "摘要": entry.get("summary", ""),
+        "原材料路径": rel_path,
+        "批处理": batch_id,
+        "图片sha256": digest,
+        "图片重复簇": image_cluster_payload(cluster) if cluster else None,
+        "processed保留文件": preserved_files,
+        "待转译": pending_voice_needs_transcript(entry),
+        "证据等级": "raw-indexed",
+    }
+    citations = [
+        "# 证据来源",
+        "",
+        f"- 原材料目录: `~/Documents/Corpus/{rel_path}`",
+    ]
+    for name in ("content.md", "llm_context.md", "transcript.md", "captures.json", "_meta.json", "image.png", "recording.wav"):
+        if (raw_root / name).exists():
+            citations.append(f"- `{name}`")
+    if (raw_root / "stitched").exists():
+        for png in sorted((raw_root / "stitched").glob("storyboard_*.png")):
+            citations.append(f"- `stitched/{png.name}`")
+
+    write_processed_file(root, "brief.md", "\n".join(brief_lines))
+    write_processed_file(root, "facts.json", json.dumps(facts, ensure_ascii=False, indent=2))
+    write_processed_file(root, "citations.md", "\n".join(citations))
+    write_processed_file(root, "open_questions.md", "# 待确认问题\n\n- 如需更细粒度 OCR/语音转写，需配置可用视觉/OCR 或 ASR 后端。\n")
+
+    if entry_type == "clipboard" and subtype == "image":
+        body = [
+            "# 图片 / 截图 OCR 与视觉观察",
+            "",
+            "## 自动处理结果",
+            duplicate_note or "此图片未归入重复簇。",
+            "",
+            "## 保留文件",
+            "\n".join(f"- `processed/{name}`" for name in preserved_files) or "- 无",
+            "",
+            "## 视觉/OCR 状态",
+            "本批处理已完成精确去重和代表图定位；如需逐字 OCR，需要可用 OCR/视觉后端或人工视觉读取。",
+        ]
+        write_processed_file(root, "ocr.md", "\n".join(body))
+    elif entry_type == "screen":
+        captures = read_text(entry_dir(entry) / "captures.json", 12000)
+        body = [
+            "# 屏幕 / 多帧时间线",
+            "",
+            "## 自动抽离",
+            str(entry.get("summary", "")),
+            "",
+            "## 保留文件",
+            "\n".join(f"- `processed/{name}`" for name in preserved_files) or "- 无",
+            "",
+            "## captures.json",
+            "```json",
+            captures,
+            "```",
+        ]
+        write_processed_file(root, "timeline.md", "\n".join(body))
+    elif entry_type == "voice":
+        transcript = read_text(entry_dir(entry) / "transcript.md", 12000)
+        body = [
+            "# 音频转写",
+            "",
+            "## 当前状态",
+            "待转译。" if pending_voice_needs_transcript(entry) else "已有转写。",
+            "",
+            "## 保留文件",
+            "\n".join(f"- `processed/{name}`" for name in preserved_files) or "- 无",
+            "",
+            "## 原 transcript.md",
+            transcript,
+        ]
+        write_processed_file(root, "transcript.md", "\n".join(body))
+
+    write_processed_file(root, "tables.csv", "source,table_name,row_index,column,value,confidence,note\n")
+    return {
+        "entry_id": entry_id,
+        "type": entry_type,
+        "subtype": subtype,
+        "path": rel_path,
+        "processed_path": str(root),
+        "image_sha256": digest,
+        "is_image_representative": is_representative,
+        "voice_pending_transcript": pending_voice_needs_transcript(entry),
+        "preserved_files": preserved_files,
+    }
+
+
+def process_pending(mark_after_process: bool = False, include_pending_voice: bool = False) -> dict:
+    entries, source = load_index()
+    unique_entries = unique_raw_entries(entries)
+    image_clusters_by_digest, image_digest_by_path = build_image_cluster_index(entries)
+    batch_id = "_batch_" + datetime.now().strftime("%Y%m%d_%H%M%S")
+    type_counts = Counter((str(e.get("type", "")), str(e.get("subtype", ""))) for e in entries)
+    unique_type_counts = Counter((str(e.get("type", "")), str(e.get("subtype", ""))) for e in unique_entries)
+    clusters_payload = [
+        image_cluster_payload(cluster)
+        for cluster in sorted(
+            image_clusters_by_digest.values(),
+            key=lambda item: (-int(item["count"]), str(item["sample_entry"])),
+        )
+    ]
+    sample_materials = goldmine_candidates(min(80, len(unique_entries))).get("materials", [])
+    report = {
+        "schema": "myrag.batch_inventory.v2",
+        "batch_id": batch_id,
+        "source": source,
+        "library_entry_count": len(entries),
+        "unique_raw_entry_count": len(unique_entries),
+        "type_counts": {f"{k[0]}/{k[1]}": v for k, v in type_counts.items()},
+        "unique_type_counts": {f"{k[0]}/{k[1]}": v for k, v in unique_type_counts.items()},
+        "image_cluster_count": len(clusters_payload),
+        "image_clusters": clusters_payload,
+        "materials": sample_materials,
+        "write_policy": "只读盘点：不会写 processed，不会写 _myrag_done.json，不会移动或删除 raw。",
+        "next_step": "LLM 应在当前对话里输出一事项一行、带横向分行线的 summary；用户确认后再决定保存或标记 raw 可清理。",
+    }
+    if mark_after_process:
+        report["mark_after_process"] = "已拒绝：--process-pending 不再批量标记 raw。请先给用户 summary，确认后再对明确接盘的 entry 使用 --mark-processed。"
+    if include_pending_voice:
+        report["include_pending_voice"] = "已忽略：只读盘点不会标记待转译语音。"
+    return report
+
+
+def batch_dir(batch_id: str) -> Path:
+    return PROCESSED / batch_id
+
+
+def load_batch_report(batch_id: str) -> dict:
+    path = batch_dir(batch_id) / "report.json"
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def write_batch_digest(batch_id: str) -> dict:
+    report = load_batch_report(batch_id)
+    if not report:
+        return {"错误": f"没有找到批处理报告: {batch_id}"}
+    worklogs = PROCESSED / "_worklogs"
+    worklogs.mkdir(parents=True, exist_ok=True)
+    out = worklogs / f"{batch_id}_digest.md"
+    type_counts = report.get("type_counts") or {}
+    clusters = report.get("image_clusters") or []
+    lines = [
+        f"# MyRAG 抽离总结 {batch_id}",
+        "",
+        "## 说明",
+        "",
+        "这是基于批次 report 生成的盘点摘要，不替代 LLM 在当前对话里的事项表 summary。真正的 MyRAG 交付应由主会话读材料后输出一事项一行、带横向分行线的表格，并等待用户确认下一步。",
+        "",
+        "## 规模与去重",
+        "",
+        f"- 原索引条目: {report.get('library_entry_count')}",
+        f"- 唯一 raw 目录: {report.get('unique_raw_entry_count')}",
+        f"- 图片精确 SHA-256 簇: {report.get('image_cluster_count')}",
+        "",
+        "## 类型分布",
+        "",
+        "| 类型 | 数量 |",
+        "| --- | --- |",
+    ]
+    for key, count in sorted(type_counts.items()):
+        lines.append(f"| {key} | {count} |")
+    lines.extend([
+        "",
+        "## 代表图片簇",
+        "",
+        "| 次数 | 代表 entry | 尺寸 | SHA-256 |",
+        "| --- | --- | --- | --- |",
+    ])
+    for cluster in clusters[:20]:
+        lines.append(
+            f"| {cluster.get('count')} | {cluster.get('sample_entry')} | {cluster.get('dimensions')} | `{cluster.get('sha256')}` |"
+        )
+    lines.extend([
+        "",
+        "## 下一步",
+        "",
+        "- 回到当前聊天窗口，按事项汇总材料内容。",
+        "- 表格必须一事项一行，并有横向分行线。",
+        "- 用户确认 raw 已接盘后，再写 `_myrag_done.json`，供 FreeRAG 清理原材料。",
+    ])
+    out.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return {"写入": str(out), "摘要": lines[:30]}
+
+
+def compact_batch_processed(batch_id: str) -> dict:
+    report = load_batch_report(batch_id)
+    if not report:
+        return {"错误": f"没有找到批处理报告: {batch_id}"}
+    archive = batch_dir(batch_id) / "per_entry"
+    archive.mkdir(parents=True, exist_ok=True)
+    moved = []
+    skipped = []
+    for item in report.get("processed_entries", []):
+        entry_id = str(item.get("entry_id", ""))
+        if not entry_id:
+            continue
+        src = processed_dir(entry_id)
+        dst = archive / entry_id
+        if not src.exists():
+            skipped.append(entry_id)
+            continue
+        if dst.exists():
+            skipped.append(entry_id)
+            continue
+        shutil.move(str(src), str(dst))
+        moved.append(entry_id)
+    return {
+        "batch_id": batch_id,
+        "archive": str(archive),
+        "moved_count": len(moved),
+        "skipped_count": len(skipped),
+        "说明": "逐条 processed 目录已收进批次 per_entry 归档，顶层 processed 不再堆几百个 entry 目录。",
+    }
+
+
 def ocr(img_path: str) -> str:
     prompt = "提取图片里所有可读文字、表格和结构化数据。中文输出；数值原样；多表格用[表格:名称]标记；不确定处标注[不确定]。"
+    command = configured_ocr_command(img_path, prompt)
+    if not command:
+        return "OCR 未配置：请设置 MYRAG_OCR_COMMAND，或在 PATH 中提供 kimi/kimi.js。"
     try:
         kwargs = {}
         if sys.platform.startswith("win") and hasattr(subprocess, "CREATE_NO_WINDOW"):
             kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
         result = subprocess.run(
-            ["node", KIMI, "--image", img_path, "--prompt", prompt],
+            command,
             capture_output=True,
             encoding="utf-8",
             timeout=180,
@@ -504,9 +1044,10 @@ def add_deep_plan(payload: dict) -> dict:
         for scene, lenses in SCENE_LENS_SUGGESTIONS
     ]
     payload["处理建议"] = {
-        "写回目录": "processed/<entry_id>/",
-        "推荐文件": ["brief.md", "deep_read.md", "facts.json", "citations.md", "open_questions.md", "ocr.md", "transcript.md", "timeline.md", "tables.csv"],
-        "原则": "先判断场景，再选择少数镜头逐轮读材料，最后做证据校准和反方攻击；不要一遍看完就泛泛总结。"
+        "默认交付": "先在当前对话里给用户一事项一行、带横向分行线的中文表格 summary 和下一步选项。",
+        "写回目录": "用户确认保存后，优先写 processed/_worklogs/ 或 processed/_batches/<batch_id>/；只有单条确有长期价值时才写 processed/<entry_id>/。",
+        "推荐文件": ["digest.md", "brief.md", "deep_read.md", "facts.json", "citations.md", "open_questions.md", "ocr.md", "transcript.md", "timeline.md", "tables.csv"],
+        "原则": "先判断场景，再选择少数镜头逐轮读材料，最后做证据校准和反方攻击；不要把大量重复 raw 逐条转换成 processed 目录。"
     }
     payload["证据校准"] = {
         "可验证事实": "材料明确出现，能指向原文、截图帧、录音转写、文件或数值。",
@@ -518,7 +1059,7 @@ def add_deep_plan(payload: dict) -> dict:
         {
             "出口": "存工作日志",
             "适用": "本次深挖本身已经形成有价值的过程记录、结论、偏好、决策或待办。",
-            "动作": "询问用户是否保存；同意后生成中文 Markdown，默认放入 ~/Documents/Corpus/processed/_worklogs/。"
+        "动作": "先在当前对话输出 summary；用户同意后生成中文 Markdown，默认放入 ~/Documents/Corpus/processed/_worklogs/。"
         },
         {
             "出口": "结合已有项目",
@@ -536,8 +1077,8 @@ def add_deep_plan(payload: dict) -> dict:
         "模式": "主会话分派，子 agent 并发读材料，主会话统一汇总。",
         "适用": "20 条以上、多模态混合、图片/音频/屏幕可独立处理时默认采用。",
         "可分派任务": ["图片 OCR 与表格抽取", "屏幕 storyboard 时间线", "语音转写与行动项", "文本条目主题深读", "低价值噪音和重复项识别"],
-        "子 agent 输出": ["范围", "关键观察", "结构化产物", "证据引用", "是否建议标记 _myrag_done.json"],
-        "汇总原则": "最终结论、证据校准、反方攻击、写回 processed 和 --mark-processed 由主会话负责。"
+        "子 agent 输出": ["范围", "关键观察", "结构化产物", "证据引用", "是否足够给用户 summary"],
+        "汇总原则": "最终结论、证据校准、反方攻击、对话 summary 由主会话负责；写回 processed 和 --mark-processed 都必须等用户确认后执行。"
     }
     return payload
 
@@ -562,8 +1103,8 @@ def print_text(results: list[dict], deep_plan: bool) -> None:
         print(f"- 类型: {item.get('type')} / {item.get('subtype')}")
         print(f"- 时间: {item.get('time')}")
         print(f"- 原材料路径: ~/Documents/Corpus/{item.get('path')}")
-        print(f"- 处理目录: ~/Documents/Corpus/{item.get('processed_path')}")
-        print(f"- 已处理: {'是' if item.get('has_processed') else '否'}")
+        print(f"- 可选处理目录: ~/Documents/Corpus/{item.get('processed_path')}")
+        print(f"- 处理层目录: {'存在' if item.get('has_processed') else '不存在'}")
         print(f"- 清理标记: {'已标记' if item.get('is_marked_processed') else '未标记'}")
         summary = item.get("summary") or ""
         if summary:
@@ -627,6 +1168,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--recent", type=int, help="读取最近 N 条")
     parser.add_argument("--suggest-projects", type=int, help="读取最近 N 条，供 LLM 归拢成候选项目/主题")
     parser.add_argument("--image-clusters", type=int, help="按精确 SHA-256 折叠 clipboard image，输出重复簇代表样本")
+    parser.add_argument("--goldmine-candidates", type=int, help="输出淘金候选材料包，供 LLM 在当前对话里做表格化内容 summary")
     parser.add_argument("--limit", type=int, default=5, help="最多返回条数")
     parser.add_argument("--format", choices=["json", "text"], default="json", help="输出格式")
     parser.add_argument("--ocr", action="store_true", help="对 screen storyboard 尝试 OCR")
@@ -634,6 +1176,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--init-processed", help="为指定 entry id 创建中文 processed 模板")
     parser.add_argument("--mark-processed", help="把指定 entry id 标记为已处理，供 FreeRAG 一键清理原材料")
     parser.add_argument("--note", default="", help="配合 --mark-processed 记录处理说明")
+    parser.add_argument("--process-pending", action="store_true", help="高级：只读盘点当前 raw，输出候选材料包；不写 processed，不标记 raw")
+    parser.add_argument("--mark-after-process", action="store_true", help="已禁用：批量盘点不再顺手写 _myrag_done.json")
+    parser.add_argument("--include-pending-voice", action="store_true", help="已禁用：只读盘点不会标记待转译录音")
+    parser.add_argument("--write-batch-digest", help="为指定批处理 id 写一份 _worklogs 抽离总结")
+    parser.add_argument("--compact-batch", help="兼容旧批次：把误生成的逐条 processed 目录收进批次 per_entry 归档")
     return parser.parse_args()
 
 
@@ -649,6 +1196,24 @@ def main() -> int:
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         return 0
 
+    if args.process_pending:
+        payload = process_pending(
+            mark_after_process=args.mark_after_process,
+            include_pending_voice=args.include_pending_voice,
+        )
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
+
+    if args.write_batch_digest:
+        payload = write_batch_digest(args.write_batch_digest)
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
+
+    if args.compact_batch:
+        payload = compact_batch_processed(args.compact_batch)
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
+
     entries, source = load_index()
     if not entries:
         payload = {"错误": "没有找到语料索引", "语料目录": str(CORPUS)}
@@ -657,6 +1222,10 @@ def main() -> int:
 
     if args.image_clusters:
         results = image_clusters(args.image_clusters)
+    elif args.goldmine_candidates:
+        payload = goldmine_candidates(args.goldmine_candidates)
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
     elif args.entry:
         results = get_entry(args.entry, include_ocr=args.ocr)
     elif args.suggest_projects:
