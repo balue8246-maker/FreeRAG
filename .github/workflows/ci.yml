@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate MyRAG Python
+        run: PYTHONPYCACHEPREFIX=/tmp/freerag_pycache python3 -m py_compile shared/skills/myrag/scripts/myrag_search.py
+
+      - name: Validate product pages
+        run: |
+          python3 -m html.parser docs/product_overview.html
+          python3 -m html.parser docs/product_overview.en.html
+          python3 -m html.parser docs/product_overview.zh-CN.html
+
+      - name: Validate app plist
+        run: plutil -lint FreeRAG/Info.plist
+
+      - name: Build native app
+        run: FreeRAG/Packaging/build_native_app.sh

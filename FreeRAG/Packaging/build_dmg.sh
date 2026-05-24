@@ -18,7 +18,11 @@ mkdir -p "$STAGE/Copy MyRAG skill to Codex-Claude"
 ditto "$APP" "$STAGE/FreeRAG.app"
 ln -s /Applications "$STAGE/Applications"
 ditto "$ROOT/shared/skills/myrag" "$STAGE/Copy MyRAG skill to Codex-Claude/myrag"
+mkdir -p "$STAGE/assets"
+ditto "$ROOT/docs/assets" "$STAGE/assets"
 ditto "$ROOT/docs/product_overview.html" "$STAGE/Read Me - Product Overview.html"
+ditto "$ROOT/docs/product_overview.en.html" "$STAGE/Product Overview - English.html"
+ditto "$ROOT/docs/product_overview.zh-CN.html" "$STAGE/Product Overview - 简体中文.html"
 
 cat > "$STAGE/README.txt" <<EOF
 FreeRAG ${VERSION} (${BUILD})
@@ -27,6 +31,8 @@ Contents:
 - FreeRAG.app
 - Applications shortcut
 - Read Me - Product Overview.html
+- Product Overview - English.html
+- Product Overview - 简体中文.html
 - Copy MyRAG skill to Codex-Claude/myrag
 
 Install:

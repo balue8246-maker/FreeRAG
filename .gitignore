@@ -8,7 +8,31 @@
 DerivedData/
 __pycache__/
 *.pyc
+dist/
+*.dmg
 
 # Local runtime corpus is outside the repo by design, but keep this ignored if
 # someone creates a test corpus here while debugging.
 Corpus/
+Documents/Corpus/
+
+# Local secrets and private notes.
+.env
+.env.*
+*.local
+*.local.*
+*API_KEY*
+*OPENAI*
+*SECRET*
+*.pem
+*.key
+*.p12
+
+# FreeRAG should never publish user-captured raw material.
+screen/
+clipboard/
+voice/
+processed/
+
+# Local handoff notes can contain machine paths and session details.
+docs/CURRENT_STATE.md

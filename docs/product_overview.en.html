@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FreeRAG - English Overview</title>
+  <style>
+    :root {
+      --ink: #15181d;
+      --muted: #63717d;
+      --line: #dce3e8;
+      --paper: #fbfaf8;
+      --panel: #ffffff;
+      --blue: #235f91;
+      --green: #2f7358;
+      --red: #9c4046;
+      --shadow: 0 18px 52px rgba(21, 24, 29, 0.12);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+      background: var(--paper);
+      color: var(--ink);
+      line-height: 1.56;
+      letter-spacing: 0;
+    }
+    .hero {
+      min-height: 82vh;
+      display: grid;
+      align-items: end;
+      color: white;
+      background:
+        linear-gradient(90deg, rgba(8,12,17,.9), rgba(8,12,17,.5) 52%, rgba(8,12,17,.12)),
+        url("assets/freerag_icon_source.png") right 12vw center / min(40vw, 440px) no-repeat,
+        #1c2630;
+    }
+    .wrap {
+      width: min(1120px, calc(100% - 48px));
+      margin: 0 auto;
+    }
+    .hero .wrap { padding: 48px 0 70px; }
+    .brand { display: flex; align-items: center; gap: 14px; margin-bottom: 78px; }
+    .brand img { width: 46px; height: 46px; }
+    .brand strong { display: block; font-size: 18px; }
+    .brand span { color: rgba(255,255,255,.72); font-size: 13px; }
+    h1 { max-width: 840px; margin: 0; font-size: 60px; line-height: 1.04; letter-spacing: 0; }
+    .lead { max-width: 720px; margin: 24px 0 0; color: rgba(255,255,255,.84); font-size: 20px; }
+    main { padding: 28px 0 72px; }
+    section { padding: 38px 0; border-bottom: 1px solid var(--line); }
+    section:last-child { border-bottom: 0; }
+    h2 { margin: 0 0 12px; font-size: 31px; letter-spacing: 0; }
+    p { margin: 0 0 14px; color: var(--muted); }
+    .flow, .grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 18px;
+    }
+    .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      box-shadow: var(--shadow);
+    }
+    .card span { color: var(--blue); font-weight: 760; font-size: 13px; }
+    .card b { display: block; margin: 5px 0 8px; }
+    .card p { margin: 0; font-size: 14px; }
+    .two {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+      margin-top: 18px;
+    }
+    ul { margin: 0; padding-left: 20px; color: var(--muted); }
+    li + li { margin-top: 8px; }
+    code { background: #eef2f5; padding: 2px 5px; border-radius: 5px; }
+    footer {
+      width: min(1120px, calc(100% - 48px));
+      margin: 0 auto;
+      padding: 24px 0 34px;
+      border-top: 1px solid var(--line);
+      color: #8a949d;
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    @media (max-width: 820px) {
+      .hero { background-size: 58vw; background-position: right -14vw top 10vw; }
+      h1 { font-size: 40px; }
+      .lead { font-size: 17px; }
+      .flow, .grid, .two { grid-template-columns: 1fr; }
+      .brand { margin-bottom: 52px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div class="wrap">
+      <div class="brand">
+        <img src="assets/freerag_icon_source.png" alt="FreeRAG icon">
+        <div>
+          <strong>FreeRAG</strong>
+          <span>Local-first raw context collector + MyRAG skill</span>
+        </div>
+      </div>
+      <h1>Save the context your LLM cannot see.</h1>
+      <p class="lead">FreeRAG catches the screen states, clipboard fragments, screenshots, and voice notes that usually disappear before you can turn them into useful context.</p>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section>
+      <h2>How It Works</h2>
+      <div class="flow">
+        <div class="card"><span>01</span><b>Collect</b><p>FreeRAG stores raw screen, clipboard, and voice material locally.</p></div>
+        <div class="card"><span>02</span><b>Deduplicate</b><p>Repeated clipboard images are folded by exact SHA-256 before reading.</p></div>
+        <div class="card"><span>03</span><b>Mine</b><p>MyRAG reads the corpus in Codex or Claude Code and extracts matters.</p></div>
+        <div class="card"><span>04</span><b>Clean</b><p>Raw material is marked done only after the user confirms the summary.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>What MyRAG Produces</h2>
+      <p>The useful output is not a pile of processed files. It is a compact summary table in the chat: one matter per row, with facts, numbers, people/projects, judgment, risk, next step, evidence, and confidence.</p>
+      <div class="grid">
+        <div class="card"><b>For dashboards</b><p>Extract metrics, time ranges, filters, account names, anomalies, and actionable conclusions.</p></div>
+        <div class="card"><b>For chats and meetings</b><p>Extract who said what, agreements, disagreements, commitments, deadlines, and hidden assumptions.</p></div>
+        <div class="card"><b>For messy screenshots</b><p>Keep representative evidence, skip low-value repeated crops, and mark uncertainty clearly.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Local-First Boundary</h2>
+      <div class="two">
+        <div class="card">
+          <b>FreeRAG does not upload by itself</b>
+          <p>The app writes local raw material to <code>~/Documents/Corpus/</code>. Cloud behavior only enters when the user explicitly asks an LLM tool to read that material.</p>
+        </div>
+        <div class="card">
+          <b>Release status</b>
+          <p>The current beta is ad-hoc signed and not notarized. OCR and ASR are not productized inside the app yet.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>What Is Included</h2>
+      <ul>
+        <li>Native Swift/AppKit macOS menu bar app.</li>
+        <li>Corpus browser with search, open, reveal, and clean-processed-raw flow.</li>
+        <li>DMG packaging with bundled MyRAG skill.</li>
+        <li>MIT-licensed source repository.</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer>
+    <div>FreeRAG 0.5.0 beta</div>
+    <div>八路出品 凑合能用</div>
+  </footer>
+</body>
+</html>
