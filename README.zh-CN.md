@@ -40,7 +40,7 @@ FreeRAG/Packaging/build_dmg.sh
 
 本地构建产物进入 `dist/`。`dist/` 已被 Git 忽略；公开二进制包应该挂到 GitHub Releases，不应该长期提交进源码仓库。
 
-当前版本：`0.5.0`，构建号 `2`。
+当前版本：`0.5.1`，构建号 `3`。
 
 ## 安装
 
@@ -50,7 +50,7 @@ FreeRAG/Packaging/build_dmg.sh
 4. 按需授予屏幕录制、辅助功能、麦克风权限。
 5. 如需 LLM 侧语料淘金，把 DMG 里的 `myrag` skill 复制到 Codex / Claude Code skill 目录。
 
-当前 beta 包是 ad-hoc signed，尚未公证，macOS 可能弹出 Gatekeeper 提示。
+当前 beta 包使用本地自签稳定签名身份，尚未使用 Apple Developer ID 签名或公证，macOS 可能弹出 Gatekeeper 提示。
 
 ## 本地语料目录
 

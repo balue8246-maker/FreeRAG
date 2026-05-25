@@ -40,7 +40,7 @@ FreeRAG/Packaging/build_dmg.sh
 
 Local build output goes to `dist/`. `dist/` is intentionally ignored by Git; public binaries should be attached to GitHub Releases instead of committed to the source repository.
 
-Current app version: `0.5.0`, build `2`.
+Current app version: `0.5.1`, build `3`.
 
 ## Install
 
@@ -50,7 +50,7 @@ Current app version: `0.5.0`, build `2`.
 4. Grant Screen Recording, Accessibility, and Microphone permissions when needed.
 5. Copy the bundled `myrag` skill into your Codex / Claude Code skill directory if you want LLM-side corpus mining.
 
-This beta build is ad-hoc signed and not notarized. macOS may show Gatekeeper warnings.
+This beta build uses a self-signed local stable signing identity and is not Apple Developer ID signed or notarized. macOS may show Gatekeeper warnings.
 
 ## Local Corpus
 

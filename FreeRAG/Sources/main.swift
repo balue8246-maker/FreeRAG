@@ -1027,15 +1027,20 @@ final class HUDController {
 
     init() {
         panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 248, height: 42), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-        panel.isFloatingPanel = true
-        panel.level = .statusBar
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
+        applyFloatingBehavior()
         panel.backgroundColor = .clear
         panel.isOpaque = false
         panel.hidesOnDeactivate = false
         panel.hasShadow = true
         panel.contentView = view
         build()
+    }
+
+    private func applyFloatingBehavior() {
+        panel.isFloatingPanel = true
+        panel.level = .screenSaver
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
+        panel.hidesOnDeactivate = false
     }
 
     private func build() {
@@ -1061,6 +1066,9 @@ final class HUDController {
             _ = make(.folder, tip: "打开语料库", muted: true) { [weak self] in self?.onFolder?() }
             _ = make(.hide, tip: "隐藏", muted: true) { [weak self] in self?.onHide?() }
         }
+        applyFloatingBehavior()
+        panel.alphaValue = 1
+        panel.ignoresMouseEvents = false
         relayout()
         if let screen = NSScreen.main {
             let f = screen.visibleFrame
@@ -1069,11 +1077,16 @@ final class HUDController {
         panel.orderFrontRegardless()
     }
 
+    func hide() {
+        panel.alphaValue = 0
+        panel.ignoresMouseEvents = true
+    }
+
     func setState(_ s: String, count: String = "") {
         state = s
         view.modeName = s
         counter.value = count
-        panel.level = s == "idle" ? .statusBar : .screenSaver
+        applyFloatingBehavior()
         relayout()
     }
 
@@ -1757,7 +1770,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         hud.onResume = { [weak self] in self?.resumeActive() }
         hud.onStop = { [weak self] in self?.stopActive() }
         hud.onFolder = { [weak self] in self?.showLibrary() }
-        hud.onHide = { [weak self] in self?.hud.panel.orderOut(nil) }
+        hud.onHide = { [weak self] in self?.hud.hide() }
         screen.onCount = { [weak self] n in self?.hud.setState("recording", count: "\(n)") }
         screen.onDone = { [weak self] msg in self?.mode = "idle"; self?.hud.setState("idle"); self?.status.button?.toolTip = msg }
         voice.onTick = { [weak self] s in self?.hud.setState("voicing", count: String(format: "%d:%02d", s/60, s%60)) }

@@ -15,15 +15,15 @@
 - [ ] `python3 -m html.parser docs/product_overview.zh-CN.html`
 - [ ] `plutil -lint FreeRAG/Info.plist dist/FreeRAG.app/Contents/Info.plist`
 - [ ] `codesign --verify --deep --strict --verbose=1 dist/FreeRAG.app`
-- [ ] `hdiutil imageinfo dist/FreeRAG-0.5.0-build-2.dmg`
+- [ ] `hdiutil imageinfo dist/FreeRAG-0.5.1-build-3.dmg`
 
 ## Release Assets
 
-- [ ] Build `dist/FreeRAG-0.5.0-build-2.dmg`.
+- [ ] Build `dist/FreeRAG-0.5.1-build-3.dmg`.
 - [ ] Generate checksum:
 
 ```bash
-shasum -a 256 dist/FreeRAG-0.5.0-build-2.dmg > dist/FreeRAG-0.5.0-build-2.dmg.sha256
+shasum -a 256 dist/FreeRAG-0.5.1-build-3.dmg > dist/FreeRAG-0.5.1-build-3.dmg.sha256
 ```
 
 - [ ] Attach both files to GitHub Release.
@@ -31,7 +31,7 @@ shasum -a 256 dist/FreeRAG-0.5.0-build-2.dmg > dist/FreeRAG-0.5.0-build-2.dmg.sh
 ## Release Text
 
 - [ ] Mention local-first privacy model.
-- [ ] Mention ad-hoc signed / not notarized.
+- [ ] Mention self-signed local stable signing / not Apple Developer ID signed / not notarized.
 - [ ] Mention permissions: Screen Recording, Accessibility, Microphone.
 - [ ] Mention MyRAG skill is optional and LLM-side.
 - [ ] Link `PRIVACY.md`, `SECURITY.md`, and product overview.
