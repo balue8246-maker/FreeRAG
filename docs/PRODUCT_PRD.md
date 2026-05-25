@@ -1,10 +1,10 @@
 # FreeRAG PRD v2
 
-更新时间：2026-05-23
+更新时间：2026-05-25
 
 ## 一句话定位
 
-FreeRAG 是一个 Mac 本地原材料收集器。它以极低操作成本收集屏幕、剪贴板、语音等零散信息，并把它们整理成 LLM 友好的本地语料；MyRAG skill 负责后续检索、多视角深挖、证据校准和处理结果沉淀。
+FreeRAG 是一个 Mac 本地原材料收集器。它以极低操作成本收集屏幕、剪贴板、语音等零散信息，并把它们整理成 LLM 友好的本地语料；MyRAG 运行时 skill 负责后续检索、多视角深挖、证据校准和处理结果沉淀，安装适配文档负责不同模型环境的看图和转录能力配置。
 
 FreeRAG 不做完整知识库、不做笔记软件、不做剪贴板历史工具，也不在采集端自动调用网络模型。它是“原材料入口 + LLM 处理层”的组合产品。
 
@@ -36,12 +36,18 @@ FreeRAG.app
        voice/
        processed/
 
-MyRAG skill
+MyRAG runtime skill
   -> 检索 _library.json / _index.json
   -> 阅读 raw entry + processed entry
   -> 多视角深挖
   -> 写回 processed/<entry_id>/
   -> 必要时生成工作日志 / 结合项目 / 外部调研
+
+MyRAG INSTALL_ADAPTERS.md
+  -> 判断当前模型是否能直接看图 / 转录
+  -> 配置 Vision / OCR 命令
+  -> 配置 ASR / Whisper 命令
+  -> 验证多模态 raw entry 是否可读
 ```
 
 ## 范围边界
@@ -58,7 +64,7 @@ MyRAG skill
 - 简单原材料库浏览。
 - 写入 LLM 友好的目录、索引和上下文文件。
 
-### MyRAG Skill 负责
+### MyRAG Runtime Skill 负责
 
 - 检索本地语料。
 - 读取原材料和已有处理结果。
@@ -68,11 +74,20 @@ MyRAG skill
 - 写回 `processed/<entry_id>/`。
 - 在深挖后收束到三个出口。
 
+### MyRAG 安装适配负责
+
+- 判断当前 Codex / Claude Code / 本地模型环境能否直接读取图片。
+- 配置可替换的 Vision / OCR 后端，不写死个人机器路径。
+- 配置可替换的 ASR / Whisper 后端。
+- 在正式处理语料前验证图片、截图和录音能被真实读取。
+- 安装适配完成后回到通用 `SKILL.md`，不把模型 workaround 混进日常语料处理协议。
+
 ### 明确不做
 
 - FreeRAG 不自动 OCR、自动转写或自动联网。
 - FreeRAG 不做复杂知识库管理。
 - FreeRAG 不做大而全的 clipboard manager。
+- MyRAG 运行协议不写死某个模型、某台机器或某个私有命令。
 - MyRAG 不无限分析，不自作主张变成项目管理系统。
 - MyRAG 不把外部调研事实和本地 RAG 结论混在一起。
 
@@ -155,6 +170,8 @@ voice/<entry_id>/
 ## MyRAG 深挖协议
 
 MyRAG 默认中文输出。它面对的不是“知识库成品”，而是用户本地收集的 raw 原材料。
+
+运行前先判断当前环境是否具备文本读取、图片/截图理解和音频转写能力。缺少图片或音频能力时，不编造内容；先按 `shared/skills/myrag/INSTALL_ADAPTERS.md` 配置 Vision / ASR，或明确告诉用户本轮只能处理文本和已有 transcript。
 
 默认流程：
 

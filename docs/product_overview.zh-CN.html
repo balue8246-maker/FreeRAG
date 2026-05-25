@@ -104,11 +104,11 @@
         <img src="assets/freerag_icon_source.png" alt="FreeRAG icon">
         <div>
           <strong>FreeRAG</strong>
-          <span>本地原材料收集器 + MyRAG 淘金 skill</span>
+          <span>本地原材料收集器 + MyRAG 运行协议</span>
         </div>
       </div>
       <h1>把 LLM 看不见的上下文先留住。</h1>
-      <p class="lead">FreeRAG 收住 Mac 上容易消失的屏幕状态、剪贴板碎片、截图和语音；MyRAG 再在 Codex 或 Claude Code 里把它们淘成事项表。</p>
+      <p class="lead">FreeRAG 收住 Mac 上容易消失的屏幕状态、剪贴板碎片、截图和语音；MyRAG 用运行时 skill 淘金，用适配指南处理不同模型的看图和转录能力。</p>
     </div>
   </header>
 
@@ -118,7 +118,7 @@
       <div class="flow">
         <div class="card"><span>01</span><b>收集</b><p>FreeRAG 把屏幕、剪贴板和语音 raw 材料保存在本地。</p></div>
         <div class="card"><span>02</span><b>去重</b><p>重复剪贴板图片先按 SHA-256 精确折叠，只读代表样本。</p></div>
-        <div class="card"><span>03</span><b>淘金</b><p>MyRAG 在 Codex / Claude Code 里读取语料，抽成事项。</p></div>
+        <div class="card"><span>03</span><b>淘金</b><p>MyRAG 运行时 skill 在 Codex / Claude Code 里读取语料，抽成事项。</p></div>
         <div class="card"><span>04</span><b>清理</b><p>用户看过 summary 并确认后，raw 才标记可清理。</p></div>
       </div>
     </section>
@@ -142,7 +142,7 @@
         </div>
         <div class="card">
           <b>Beta 状态</b>
-          <p>当前包使用本地自签稳定签名身份，尚未使用 Apple Developer ID 签名或公证。OCR 和 ASR 还没有产品化进 app。</p>
+          <p>当前包使用本地自签稳定签名身份，尚未使用 Apple Developer ID 签名或公证。OCR 和 ASR 不内置进 app；当前模型缺能力时按 MyRAG 适配指南配置。</p>
         </div>
       </div>
     </section>
@@ -152,7 +152,7 @@
       <ul>
         <li>Swift/AppKit 原生 macOS 菜单栏 app。</li>
         <li>原材料库搜索、打开、Finder 定位和清理已处理 raw。</li>
-        <li>DMG 打包，附带 MyRAG skill。</li>
+        <li>DMG 打包，附带 MyRAG 运行时 skill 和 Vision / ASR 适配指南。</li>
         <li>MIT 开源。</li>
       </ul>
     </section>

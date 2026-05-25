@@ -33,5 +33,6 @@ shasum -a 256 dist/FreeRAG-0.5.1-build-3.dmg > dist/FreeRAG-0.5.1-build-3.dmg.sh
 - [ ] Mention local-first privacy model.
 - [ ] Mention self-signed local stable signing / not Apple Developer ID signed / not notarized.
 - [ ] Mention permissions: Screen Recording, Accessibility, Microphone.
-- [ ] Mention MyRAG skill is optional and LLM-side.
+- [ ] Mention MyRAG runtime skill is optional and LLM-side.
+- [ ] Mention `INSTALL_ADAPTERS.md` is for model-specific Vision / ASR setup, not part of the app runtime.
 - [ ] Link `PRIVACY.md`, `SECURITY.md`, and product overview.

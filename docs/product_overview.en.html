@@ -104,7 +104,7 @@
         <img src="assets/freerag_icon_source.png" alt="FreeRAG icon">
         <div>
           <strong>FreeRAG</strong>
-          <span>Local-first raw context collector + MyRAG skill</span>
+          <span>Local-first raw context collector + MyRAG runtime</span>
         </div>
       </div>
       <h1>Save the context your LLM cannot see.</h1>
@@ -118,7 +118,7 @@
       <div class="flow">
         <div class="card"><span>01</span><b>Collect</b><p>FreeRAG stores raw screen, clipboard, and voice material locally.</p></div>
         <div class="card"><span>02</span><b>Deduplicate</b><p>Repeated clipboard images are folded by exact SHA-256 before reading.</p></div>
-        <div class="card"><span>03</span><b>Mine</b><p>MyRAG reads the corpus in Codex or Claude Code and extracts matters.</p></div>
+        <div class="card"><span>03</span><b>Mine</b><p>The MyRAG runtime skill reads the corpus in Codex or Claude Code and extracts matters.</p></div>
         <div class="card"><span>04</span><b>Clean</b><p>Raw material is marked done only after the user confirms the summary.</p></div>
       </div>
     </section>
@@ -142,7 +142,7 @@
         </div>
         <div class="card">
           <b>Release status</b>
-          <p>The current beta uses self-signed local stable signing and is not Apple Developer ID signed or notarized. OCR and ASR are not productized inside the app yet.</p>
+          <p>The current beta uses self-signed local stable signing and is not Apple Developer ID signed or notarized. OCR and ASR are configured through the MyRAG adapter guide when the current model needs them.</p>
         </div>
       </div>
     </section>
@@ -152,7 +152,7 @@
       <ul>
         <li>Native Swift/AppKit macOS menu bar app.</li>
         <li>Corpus browser with search, open, reveal, and clean-processed-raw flow.</li>
-        <li>DMG packaging with bundled MyRAG skill.</li>
+        <li>DMG packaging with bundled MyRAG runtime skill and Vision / ASR adapter guide.</li>
         <li>MIT-licensed source repository.</li>
       </ul>
     </section>

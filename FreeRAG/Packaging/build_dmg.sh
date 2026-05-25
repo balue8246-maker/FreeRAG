@@ -49,6 +49,8 @@ Install:
 
 MyRAG:
 FreeRAG collects raw local material. MyRAG reads it in Codex/Claude Code, summarizes by matter/item in the chat, and only marks raw as done after the user confirms the summary.
+Use MyRAG skill/myrag/SKILL.md for normal corpus mining.
+Use MyRAG skill/myrag/INSTALL_ADAPTERS.md only when your model needs Vision/OCR or ASR setup for images, screenshots, or recordings.
 
 Permissions:
 macOS permissions are tied mainly to bundle id, signing identity, and app location.

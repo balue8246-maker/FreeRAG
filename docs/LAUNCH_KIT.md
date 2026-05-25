@@ -10,7 +10,7 @@ FreeRAG is a tiny macOS menu bar app that turns screenshots, clipboard fragments
 
 I built FreeRAG because LLM work often loses context in the places agents cannot naturally see: screenshots, copied snippets, app states, meetings, and half-finished thoughts.
 
-FreeRAG collects that raw material locally under `~/Documents/Corpus/`. The bundled MyRAG skill can then read recent material inside Codex / Claude Code, fold repeated screenshots, and summarize by matter in a table.
+FreeRAG collects that raw material locally under `~/Documents/Corpus/`. The bundled MyRAG runtime skill can then read recent material inside Codex / Claude Code, fold repeated screenshots, and summarize by matter in a table. A separate adapter guide covers Vision / ASR setup when the current model cannot read images or transcribe audio.
 
 The app does not upload raw material by itself. It is a local-first collector plus an LLM-side mining workflow.
 
@@ -27,7 +27,7 @@ Body:
 ```text
 I built FreeRAG because my coding-agent context was scattered across screenshots, clipboard snippets, browser tabs, voice notes, and transient app states.
 
-FreeRAG is a small native macOS menu bar app. It collects raw material locally into ~/Documents/Corpus/: screen evidence, clipboard text/images, and voice notes. A bundled MyRAG skill can then read that local corpus in Codex / Claude Code, fold duplicates, and summarize by matter in a table.
+FreeRAG is a small native macOS menu bar app. It collects raw material locally into ~/Documents/Corpus/: screen evidence, clipboard text/images, and voice notes. A bundled MyRAG runtime skill can then read that local corpus in Codex / Claude Code, fold duplicates, and summarize by matter in a table. The adapter guide covers Vision / ASR setup for models that need it.
 
 It does not upload raw material by itself. The current beta is open source, local-first, and intentionally simple. OCR/ASR are not productized inside the app yet.
 
@@ -44,7 +44,7 @@ I built a tiny macOS menu bar app for a problem I keep hitting with coding agent
 
 useful context lives in screenshots, clipboard snippets, voice notes, and short-lived app states.
 
-FreeRAG collects that raw material locally into ~/Documents/Corpus/, then a bundled MyRAG skill can mine it inside Codex / Claude Code.
+FreeRAG collects that raw material locally into ~/Documents/Corpus/, then a bundled MyRAG runtime skill can mine it inside Codex / Claude Code. Model-specific image/audio setup lives in a separate adapter guide.
 
 Open source beta:
 https://github.com/balue8246-maker/FreeRAG
@@ -55,7 +55,7 @@ https://github.com/balue8246-maker/FreeRAG
 ```text
 I made a small local-first macOS app for collecting context that LLM/coding agents usually cannot see.
 
-FreeRAG lives in the menu bar and saves screenshots, clipboard text/images, and voice notes into ~/Documents/Corpus/. It ships with a MyRAG skill that can read that local corpus from Codex / Claude Code, deduplicate repeated screenshots, and summarize by matter.
+FreeRAG lives in the menu bar and saves screenshots, clipboard text/images, and voice notes into ~/Documents/Corpus/. It ships with a MyRAG runtime skill that can read that local corpus from Codex / Claude Code, deduplicate repeated screenshots, and summarize by matter. Vision / ASR setup lives in a separate adapter guide for models that need it.
 
 It does not upload raw material by itself. Current beta is open source and still rough around signing/notarization.
 
@@ -72,7 +72,7 @@ I am not trying to sell anything. I mostly want feedback from people who use loc
 
 它不做复杂 AI，不默认联网分析，只负责把截图、剪贴板文字/图片、语音笔记这些 raw 材料低成本收进本地 ~/Documents/Corpus/。
 
-后面用仓库里附带的 MyRAG skill，在 Codex / Claude Code 对话里读取这些材料，先去重，再按“事项”输出一行一项的 summary 表格，让人判断哪些值得保存、哪些 raw 可以清理。
+后面用仓库里附带的 MyRAG 运行时 skill，在 Codex / Claude Code 对话里读取这些材料，先去重，再按“事项”输出一行一项的 summary 表格，让人判断哪些值得保存、哪些 raw 可以清理。不同模型的看图/转录能力，放到单独的适配指南里处理。
 
 目前是开源 beta，macOS signing/notarization 还不完整。想找真实用户反馈：
 - 这个工作流你会不会用？
@@ -96,7 +96,6 @@ https://github.com/balue8246-maker/FreeRAG
 
 - Add a real demo GIF to README.
 - Improve Gatekeeper / permission troubleshooting docs.
-- Add a MyRAG end-to-end example with sample anonymized corpus.
+- Add a MyRAG end-to-end example with sample anonymized corpus, including when to use the adapter guide.
 - Add an Obsidian export target for processed worklogs.
 - Split `FreeRAG/Sources/main.swift` into smaller AppKit modules.
-

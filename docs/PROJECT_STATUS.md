@@ -12,14 +12,15 @@ FreeRAG is currently prepared for a public GitHub beta release.
 ## Product Boundary
 
 - FreeRAG app: collects local raw material on macOS.
-- MyRAG skill: reads the local corpus in Codex / Claude Code and summarizes it by matter.
+- MyRAG runtime skill: reads the local corpus in Codex / Claude Code and summarizes it by matter.
+- MyRAG adapter guide: documents Vision / ASR setup for model environments that cannot directly read images or transcribe audio.
 - Raw material cleanup happens only after the user confirms the MyRAG summary.
 
 ## Current Limitations
 
 - The beta build uses self-signed local stable signing and is not Apple Developer ID signed or notarized.
-- OCR and ASR are not built into the app yet.
-- MyRAG depends on the user's LLM environment.
+- OCR and ASR are not built into the app; they are configured on the MyRAG / LLM-tool side when needed.
+- MyRAG still depends on the user's LLM environment and configured local tools.
 - Public release binaries should be attached to GitHub Releases, not committed to source.
 
 ## Release Prep Documents

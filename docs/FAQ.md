@@ -16,6 +16,11 @@ Not exactly. FreeRAG uses screenshots as raw evidence, but the product goal is l
 
 MyRAG is the bundled LLM-side workflow. It reads the local corpus in Codex / Claude Code, folds repeated material, groups entries by matter, and summarizes evidence in the chat.
 
+It is intentionally split into two files:
+
+- `SKILL.md` for normal runtime corpus mining.
+- `INSTALL_ADAPTERS.md` for model-specific Vision / ASR setup.
+
 If your model cannot read images or transcribe audio, configure a Vision or ASR backend with `shared/skills/myrag/INSTALL_ADAPTERS.md`.
 
 ## Does FreeRAG upload my screenshots, clipboard, or recordings?
@@ -69,7 +74,8 @@ Then launch FreeRAG and grant permissions again.
 FreeRAG intentionally keeps the app small. The current approach is:
 
 - collect raw material cheaply in the macOS app;
-- let MyRAG / LLM tooling decide what is worth OCR, transcription, or deeper reading.
+- let MyRAG / LLM tooling decide what is worth OCR, transcription, or deeper reading;
+- keep model-specific Vision / ASR setup in `INSTALL_ADAPTERS.md` instead of baking it into the app or the runtime skill.
 
 This avoids turning every noisy raw entry into expensive processed output.
 

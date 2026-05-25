@@ -67,6 +67,8 @@ You can:
 
 In Codex / Claude Code, ask MyRAG to inspect recent material.
 
+Use `SKILL.md` for the normal mining workflow. If the current model cannot read images or transcribe audio, configure that first with `shared/skills/myrag/INSTALL_ADAPTERS.md`; otherwise MyRAG should clearly limit itself to text and existing transcripts.
+
 Example:
 
 ```text
@@ -106,6 +108,5 @@ FreeRAG's cleanup action only deletes raw directories with that marker. It does 
 
 - FreeRAG is not trying to be a full AI app.
 - The macOS app collects raw evidence cheaply.
-- MyRAG does the reading and synthesis inside an LLM tool the user already controls.
+- MyRAG does the reading and synthesis inside an LLM tool the user already controls, with model-specific Vision / ASR setup kept in the adapter guide.
 - The user stays in charge of when raw material becomes processed knowledge.
-

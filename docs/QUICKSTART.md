@@ -70,6 +70,11 @@ Raw entries usually include `_meta.json`, `llm_context.md`, and the original mat
 
 The DMG includes a `myrag` skill folder. Copy it into your Codex / Claude Code skill directory if you want LLM-side corpus mining.
 
+MyRAG is split into two responsibilities:
+
+- `SKILL.md`: the normal runtime workflow for searching, deduplicating, reading, and summarizing the corpus.
+- `INSTALL_ADAPTERS.md`: setup instructions for model environments that need external Vision / ASR support.
+
 If your current LLM environment cannot read images or transcribe audio, follow the adapter guide:
 
 ```text

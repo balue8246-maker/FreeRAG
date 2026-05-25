@@ -149,11 +149,11 @@
         <img src="assets/freerag_icon_source.png" alt="FreeRAG icon">
         <div>
           <strong>FreeRAG</strong>
-          <span>Local-first raw context for LLM workflows</span>
+          <span>Local-first raw context + MyRAG runtime</span>
         </div>
       </div>
       <h1>Capture the messy context before it disappears.</h1>
-      <p class="lead">FreeRAG collects local raw material on macOS. MyRAG later mines it in Codex or Claude Code and turns fragments into a matter-by-matter summary table.</p>
+      <p class="lead">FreeRAG collects local raw material on macOS. MyRAG later mines it in Codex or Claude Code with a runtime skill plus an adapter guide for image and audio environments.</p>
       <div class="actions">
         <a class="button" href="product_overview.en.html">English Overview</a>
         <a class="button" href="product_overview.zh-CN.html">简体中文介绍</a>
@@ -167,7 +167,7 @@
       <p>FreeRAG is a small native macOS menu bar app. It collects screen evidence, clipboard text/images, and voice notes into a local corpus folder. It is not a cloud knowledge base and it does not analyze your material by itself.</p>
       <div class="grid">
         <div class="card"><b>Collect Raw Evidence</b><p>Save screen, clipboard, and voice fragments before they get lost in app switching.</p></div>
-        <div class="card"><b>Mine With MyRAG</b><p>Use the bundled skill in Codex or Claude Code to read the local corpus and summarize it.</p></div>
+        <div class="card"><b>Mine With MyRAG</b><p>Use the runtime skill to summarize by matter; use the adapter guide only when a model needs Vision or ASR setup.</p></div>
         <div class="card"><b>Clean After Confirmation</b><p>Raw material is marked done only after the user has reviewed the summary.</p></div>
       </div>
     </section>
@@ -181,7 +181,7 @@
         </div>
         <div class="card">
           <b>For LLM workflows with evidence</b>
-          <p>MyRAG reads the collected material and produces a table with facts, risks, next steps, evidence, and confidence.</p>
+          <p>MyRAG keeps daily corpus mining separate from model-specific setup, then produces a table with facts, risks, next steps, evidence, and confidence.</p>
         </div>
       </div>
     </section>
@@ -192,13 +192,14 @@
         <li>Local corpus path: <code>~/Documents/Corpus/</code></li>
         <li>Current release target: <code>v0.5.1-beta.1</code></li>
         <li>The beta DMG uses self-signed local stable signing and is not Apple Developer ID signed or notarized.</li>
-        <li>OCR and ASR are not productized inside the app yet.</li>
+        <li>OCR and ASR are not productized inside the app; configure them through <code>INSTALL_ADAPTERS.md</code> when your model needs help.</li>
       </ul>
       <div class="badge-row">
         <span class="badge">MIT License</span>
         <span class="badge">macOS</span>
         <span class="badge">Swift / AppKit</span>
-        <span class="badge">MyRAG skill included</span>
+        <span class="badge">MyRAG runtime skill</span>
+        <span class="badge">Adapter guide included</span>
       </div>
     </section>
   </main>

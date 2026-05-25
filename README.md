@@ -43,7 +43,12 @@ This beta build uses a self-signed local stable signing identity and is not Appl
 
 FreeRAG collects. MyRAG reads and mines.
 
-FreeRAG does not upload screenshots, clipboard content, or voice recordings by itself. The local corpus is intended for explicit use by the user through Codex / Claude Code and the bundled MyRAG skill.
+FreeRAG does not upload screenshots, clipboard content, or voice recordings by itself. The local corpus is intended for explicit use by the user through Codex / Claude Code and the bundled MyRAG runtime skill.
+
+MyRAG is split into two layers:
+
+- `SKILL.md`: the runtime corpus-mining protocol used during normal work.
+- `INSTALL_ADAPTERS.md`: one-time model/environment setup for Vision and ASR when the current LLM cannot read images or transcribe audio.
 
 MyRAG output is table-first: one matter per row, with facts, numbers, people/projects, judgment, risk, next step, evidence, and confidence merged into the same row. Large repeated clipboard images are folded by exact SHA-256 before reading representative samples.
 
@@ -52,6 +57,7 @@ MyRAG output is table-first: one matter per row, with facts, numbers, people/pro
 - Captures local raw material into a consistent corpus folder.
 - Keeps the macOS app small: no automatic cloud analysis, no default OCR, no default transcription.
 - Lets MyRAG read the local corpus and produce a matter-by-matter summary table for the user.
+- Keeps model-specific Vision / ASR setup outside the runtime skill, so the daily MyRAG workflow stays portable.
 - Marks raw material as done only after the user has reviewed the summary and confirmed that the raw evidence has been taken over.
 
 ## Repository Layout
@@ -61,7 +67,7 @@ FreeRAG/
   Packaging/                 Build scripts for the native app and DMG.
   Resources/Assets/           App icon and status assets.
   Sources/main.swift          Swift/AppKit app implementation.
-shared/skills/myrag/          MyRAG skill and local corpus helper script.
+shared/skills/myrag/          MyRAG runtime skill and local corpus helper script.
 shared/skills/myrag/INSTALL_ADAPTERS.md
                               Vision / ASR setup for different model environments.
 docs/                         Product docs, public status, and overview pages.
@@ -86,6 +92,7 @@ Current app version: `0.5.1`, build `3`.
 3. Launch it from `/Applications` so macOS permissions stay tied to a stable app location.
 4. Grant Screen Recording, Accessibility, and Microphone permissions when needed.
 5. Copy the bundled `myrag` skill into your Codex / Claude Code skill directory if you want LLM-side corpus mining.
+6. If your current model cannot inspect images or transcribe recordings, follow `shared/skills/myrag/INSTALL_ADAPTERS.md` before using MyRAG on multimodal corpus entries.
 
 ## Local Corpus
 

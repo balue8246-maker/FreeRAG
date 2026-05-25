@@ -14,6 +14,11 @@ This is a focused bugfix release for the macOS HUD bar and local beta signing be
 - This is intended to make local macOS permissions more stable across FreeRAG rebuilds on the same signing identity.
 - This is not Apple Developer ID signing and the app is still not notarized, so macOS Gatekeeper may still warn on first launch.
 
+## Packaging and Docs
+
+- The DMG now uses a guided Finder layout with background labels for the app, Applications shortcut, product overview, README, MyRAG skill, and assets.
+- MyRAG docs are split into the runtime `SKILL.md` and `INSTALL_ADAPTERS.md` for model-specific Vision / ASR setup.
+
 ## Assets
 
 - `FreeRAG-0.5.1-build-3.dmg`
