@@ -20,7 +20,7 @@ It is built for people who use Codex / Claude Code and keep losing useful contex
   <a href="docs/LAUNCH_KIT.md">Launch Kit</a>
 </p>
 
-![FreeRAG social preview](docs/assets/freerag_social_preview.svg)
+![FreeRAG social preview](docs/assets/freerag_social_preview_v2.svg)
 
 ## 30-Second Flow
 
