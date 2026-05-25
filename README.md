@@ -9,6 +9,12 @@ It is built for people who use Codex / Claude Code and keep losing useful contex
 <p>
   <a href="https://github.com/balue8246-maker/FreeRAG/releases/download/v0.5.1-beta.1/FreeRAG-0.5.1-build-3.dmg"><strong>Download DMG</strong></a>
   ·
+  <a href="docs/QUICKSTART.md">Quickstart</a>
+  ·
+  <a href="docs/DEMO.md">Demo</a>
+  ·
+  <a href="docs/FAQ.md">FAQ</a>
+  ·
   <a href="https://github.com/balue8246-maker/FreeRAG/releases/latest">Latest Release</a>
   ·
   <a href="docs/LAUNCH_KIT.md">Launch Kit</a>
@@ -104,6 +110,9 @@ See [SECURITY.md](SECURITY.md) for reporting and release-safety notes.
 
 ## Product Pages
 
+- [Quickstart](docs/QUICKSTART.md)
+- [Demo walkthrough](docs/DEMO.md)
+- [FAQ](docs/FAQ.md)
 - [Simplified Chinese product overview](docs/product_overview.zh-CN.html)
 - [English product overview](docs/product_overview.en.html)
 

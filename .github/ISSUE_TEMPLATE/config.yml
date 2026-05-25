@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Quickstart and troubleshooting
+    url: https://github.com/balue8246-maker/FreeRAG/blob/main/docs/QUICKSTART.md
+    about: Installation, macOS permissions, and first-run troubleshooting.
+  - name: FAQ
+    url: https://github.com/balue8246-maker/FreeRAG/blob/main/docs/FAQ.md
+    about: Product boundary, privacy model, signing status, and common questions.
+  - name: Demo walkthrough
+    url: https://github.com/balue8246-maker/FreeRAG/blob/main/docs/DEMO.md
+    about: See the intended FreeRAG + MyRAG workflow.
