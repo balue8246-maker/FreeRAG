@@ -32,6 +32,26 @@ func timestamp(_ format: String = "yyyyMMdd_HHmmss") -> String {
     return f.string(from: Date())
 }
 
+func displayLocalTime(_ raw: String) -> String {
+    guard !raw.isEmpty else { return "" }
+    let iso = ISO8601DateFormatter()
+    iso.formatOptions = [.withInternetDateTime, .withDashSeparatorInDate, .withColonSeparatorInTime]
+    let date = iso.date(from: raw)
+    ?? {
+        let fallback = ISO8601DateFormatter()
+        fallback.formatOptions = [.withInternetDateTime, .withDashSeparatorInDate, .withColonSeparatorInTime, .withFractionalSeconds]
+        return fallback.date(from: raw)
+    }()
+    guard let date else {
+        return String(raw.prefix(16)).replacingOccurrences(of: "T", with: " ")
+    }
+    let f = DateFormatter()
+    f.locale = Locale(identifier: "en_US_POSIX")
+    f.timeZone = .current
+    f.dateFormat = "yyyy-MM-dd HH:mm"
+    return f.string(from: date)
+}
+
 func uniqueID(_ suffix: String? = nil) -> String {
     let f = DateFormatter()
     f.dateFormat = "yyyyMMdd_HHmmss_SSS"
@@ -79,6 +99,7 @@ func normalizedLibraryEntries(_ entries: [[String: Any]]) -> [[String: Any]] {
             "path": relativePath,
             "llm_context": relativePath.isEmpty ? "" : "\(relativePath)llm_context.md",
             "processed_path": "processed/\(entryID)/",
+            "capture_group": entry["capture_group"] as? String ?? "",
             "role": "raw",
             "tags": entry["tags"] as? [String] ?? []
         ]
@@ -118,10 +139,11 @@ func entryIsMarkedProcessed(_ entry: [String: Any]) -> Bool {
     entryHasRawProcessedMarker(entry)
 }
 
-func writeLLMContext(title: String, type: String, summary: String, files: [String], to dir: URL) {
+func writeLLMContext(title: String, type: String, summary: String, files: [String], to dir: URL, captureGroup: String? = nil) {
     let fileList = files.map { "- `\($0)`" }.joined(separator: "\n")
     let entryID = dir.lastPathComponent
     let processedPath = "processed/\(entryID)/"
+    let captureGroupLine = captureGroup.map { "采集组: \($0)\n" } ?? ""
     let body = """
     # \(title)
 
@@ -129,6 +151,7 @@ func writeLLMContext(title: String, type: String, summary: String, files: [Strin
     类型: \(type)
     时间: \(nowISO())
     原材料路径: \(dir.path)
+    \(captureGroupLine)\
     可选处理目录: \(processedPath)
 
     ## 摘要
@@ -544,6 +567,7 @@ final class HUDView: NSVisualEffectView {
         switch modeName {
         case "recording": stroke = NSColor.systemTeal.withAlphaComponent(0.52)
         case "voicing": stroke = NSColor.systemGreen.withAlphaComponent(0.50)
+        case "both": stroke = NSColor.systemBlue.withAlphaComponent(0.54)
         case "paused": stroke = NSColor.systemOrange.withAlphaComponent(0.48)
         default: stroke = NSColor.separatorColor.withAlphaComponent(0.42)
         }
@@ -757,7 +781,8 @@ func makeScreenStoryboards(captures: [[String: Any]], in dir: URL, outputDir: UR
         ]
         var y = totalHeight
         for (idx, item) in loaded.enumerated() {
-            let label = "\(item.cap["seq"] ?? idx + 1)  \(item.cap["time"] ?? "")  \(item.cap["title"] ?? "")"
+            let time = displayLocalTime(item.cap["time"] as? String ?? "")
+            let label = "\(item.cap["seq"] ?? idx + 1)  \(time)  \(item.cap["title"] ?? "")"
             y -= labelHeight
             (label as NSString).draw(
                 at: NSPoint(x: 14, y: y + 8),
@@ -791,6 +816,7 @@ final class ScreenCollector {
     private var stable = 0
     private var lastSignature: [UInt8]?
     private var paused = false
+    private var captureGroup: String?
     var onCount: ((Int) -> Void)?
     var onDone: ((String) -> Void)?
 
@@ -799,13 +825,13 @@ final class ScreenCollector {
         self.store = store
     }
 
-    func start() {
-        prepareSession()
+    func start(captureGroup: String? = nil) {
+        prepareSession(captureGroup: captureGroup)
         capture(force: true)
         schedule()
     }
 
-    private func prepareSession() {
+    private func prepareSession(captureGroup: String? = nil) {
         let info = platform.frontWindow()
         session = "\(uniqueID())_\(sanitize(info?.displayTitle ?? "screen"))"
         dir = screenRoot.appendingPathComponent(session)
@@ -815,6 +841,7 @@ final class ScreenCollector {
         stable = 0
         lastSignature = nil
         paused = false
+        self.captureGroup = captureGroup
     }
 
     private func schedule() {
@@ -842,8 +869,8 @@ final class ScreenCollector {
         }
     }
 
-    func single() {
-        prepareSession()
+    func single(captureGroup: String? = nil) {
+        prepareSession(captureGroup: captureGroup)
         capture(force: true)
         pipeline()
     }
@@ -887,24 +914,32 @@ final class ScreenCollector {
             ensureDir(stitched)
             let storyboardFiles = makeScreenStoryboards(captures: self.caps, in: dir, outputDir: stitched)
             writeJSON(self.caps, to: dir.appendingPathComponent("captures.json"))
-            let meta: [String: Any] = [
+            var meta: [String: Any] = [
                 "session": self.session, "time": nowISO(), "count": self.count, "deduped": self.stable, "storyboards": storyboardFiles,
                 "titles": Array(Set(self.caps.compactMap { $0["title"] as? String })),
                 "summary": "\(self.count) 张有效截图，过滤 \(self.stable) 张近似重复画面", "platform": "macos-native"
             ]
+            if let captureGroup = self.captureGroup {
+                meta["capture_group"] = captureGroup
+            }
             writeJSON(meta, to: dir.appendingPathComponent("_meta.json"))
             writeLLMContext(
                 title: self.caps.first?["title"] as? String ?? self.session,
                 type: "screen",
                 summary: "\(self.count) 张去重后的屏幕证据。storyboard 按时间顺序保留画面，供后续 LLM 阅读、OCR、复盘或信息抽取。",
                 files: storyboardFiles + ["captures.json", "_meta.json"],
-                to: dir
+                to: dir,
+                captureGroup: self.captureGroup
             )
-            self.store.addEntry([
+            var entry: [String: Any] = [
                 "id": self.session, "type": "screen", "time": nowISO(),
                 "title": self.caps.first?["title"] as? String ?? "screen",
                 "tags": [], "summary": meta["summary"]!, "path": "screen/\(self.session)/"
-            ])
+            ]
+            if let captureGroup = self.captureGroup {
+                entry["capture_group"] = captureGroup
+            }
+            self.store.addEntry(entry)
             DispatchQueue.main.async { self.onDone?("已保存 \(self.count) 张") }
         }
     }
@@ -920,17 +955,19 @@ final class VoiceRecorder: NSObject, AVAudioRecorderDelegate {
     private var runningSince: Date?
     private var accumulated: TimeInterval = 0
     private var dir: URL?
+    private var captureGroup: String?
     var onTick: ((Int) -> Void)?
     var onDone: ((String) -> Void)?
     private var timer: Timer?
 
     init(store: CorpusStore) { self.store = store }
 
-    func start() {
+    func start(captureGroup: String? = nil) {
         ensureDir(voiceRoot)
         let id = uniqueID("voice")
         dir = voiceRoot.appendingPathComponent(id)
         ensureDir(dir!)
+        self.captureGroup = captureGroup
         accumulated = 0
         let url = dir!.appendingPathComponent("recording.wav")
         let settings: [String: Any] = [
@@ -992,7 +1029,11 @@ final class VoiceRecorder: NSObject, AVAudioRecorderDelegate {
         timer = nil
         guard let dir else { return }
         let duration = accumulated
-        writeJSON(["time": nowISO(), "duration": duration, "sample_rate": 16000, "channels": 1], to: dir.appendingPathComponent("_meta.json"))
+        var meta: [String: Any] = ["time": nowISO(), "duration": duration, "sample_rate": 16000, "channels": 1]
+        if let captureGroup {
+            meta["capture_group"] = captureGroup
+        }
+        writeJSON(meta, to: dir.appendingPathComponent("_meta.json"))
         let id = dir.lastPathComponent
         try? "# 录音 \(id)\n时长: \(Int(duration))s\n\n*(待转译)*\n".write(to: dir.appendingPathComponent("transcript.md"), atomically: true, encoding: .utf8)
         writeLLMContext(
@@ -1000,12 +1041,17 @@ final class VoiceRecorder: NSObject, AVAudioRecorderDelegate {
             type: "voice",
             summary: "本地语音笔记，时长 \(Int(duration)) 秒。当前保存原始录音，转写可由后续 LLM/语音工具补齐。",
             files: ["recording.wav", "transcript.md", "_meta.json"],
-            to: dir
+            to: dir,
+            captureGroup: captureGroup
         )
-        store.addEntry([
+        var entry: [String: Any] = [
             "id": id, "type": "voice", "time": nowISO(), "title": "录音 \(id)",
             "tags": [], "summary": "时长 \(Int(duration))s", "path": "voice/\(id)/"
-        ])
+        ]
+        if let captureGroup {
+            entry["capture_group"] = captureGroup
+        }
+        store.addEntry(entry)
         onDone?("录音已保存 \(Int(duration))s")
     }
 }
@@ -1074,6 +1120,7 @@ final class HUDController {
             let f = screen.visibleFrame
             panel.setFrameOrigin(NSPoint(x: f.maxX - panel.frame.width - 28, y: f.maxY - 64))
         }
+        constrainToVisibleScreen()
         panel.orderFrontRegardless()
     }
 
@@ -1088,6 +1135,16 @@ final class HUDController {
         counter.value = count
         applyFloatingBehavior()
         relayout()
+        constrainToVisibleScreen()
+    }
+
+    private func constrainToVisibleScreen() {
+        guard let screen = panel.screen ?? NSScreen.main else { return }
+        let f = screen.visibleFrame
+        var origin = panel.frame.origin
+        origin.x = min(max(origin.x, f.minX + 8), f.maxX - panel.frame.width - 8)
+        origin.y = min(max(origin.y, f.minY + 8), f.maxY - panel.frame.height - 8)
+        panel.setFrameOrigin(origin)
     }
 
     private func relayout() {
@@ -1105,9 +1162,13 @@ final class HUDController {
         switch state {
         case "recording":
             counter.isHidden = false
-            pause?.isHidden = false; stop?.isHidden = false; stop?.accent = .systemRed
-            visible = [counter, pause, stop].compactMap { $0 }
+            mic?.isHidden = false; pause?.isHidden = false; stop?.isHidden = false; stop?.accent = .systemRed
+            visible = [counter, mic, pause, stop].compactMap { $0 }
         case "voicing":
+            counter.isHidden = false
+            rec?.isHidden = false; shot?.isHidden = false; pause?.isHidden = false; stop?.isHidden = false; stop?.accent = .systemRed
+            visible = [counter, rec, shot, pause, stop].compactMap { $0 }
+        case "both":
             counter.isHidden = false
             pause?.isHidden = false; stop?.isHidden = false; stop?.accent = .systemRed
             visible = [counter, pause, stop].compactMap { $0 }
@@ -1128,7 +1189,8 @@ final class HUDController {
                 view.separatorX = x + 2
                 x += 8
             }
-            let w: CGFloat = v === counter ? 52 : 30
+            let counterWidth = min(max(CGFloat(max(4, counter.value.count)) * 8 + 16, 52), 96)
+            let w: CGFloat = v === counter ? counterWidth : 30
             v.frame = NSRect(x: x, y: 6, width: w, height: 30)
             x += w + 4
         }
@@ -1541,7 +1603,7 @@ final class LibraryWindow: NSWindowController, NSTableViewDataSource, NSTableVie
     private func displayValue(for entry: [String: Any], column: String) -> String {
         switch column {
         case "time":
-            return String((entry["time"] as? String ?? "").prefix(16)).replacingOccurrences(of: "T", with: " ")
+            return displayLocalTime(entry["time"] as? String ?? "")
         case "type":
             switch entry["type"] as? String {
             case "screen": return "屏幕"
@@ -1589,7 +1651,8 @@ final class LibraryWindow: NSWindowController, NSTableViewDataSource, NSTableVie
 
         角色: 原材料
         类型: \(displayValue(for: entry, column: "type"))
-        时间: \(entry["time"] as? String ?? "")
+        时间: \(displayLocalTime(entry["time"] as? String ?? ""))
+        原始时间: \(entry["time"] as? String ?? "")
         路径: \(path)
         状态: \(entryIsMarkedProcessed(entry) ? "已处理，可清理原材料" : "未处理")
         可选处理输出: processed/\(entry["id"] as? String ?? "")/
@@ -1688,6 +1751,16 @@ final class LibraryWindow: NSWindowController, NSTableViewDataSource, NSTableVie
     }
 }
 
+enum CaptureActivityState {
+    case idle
+    case running
+    case paused
+
+    var isActive: Bool { self != .idle }
+    var isRunning: Bool { self == .running }
+    var isPaused: Bool { self == .paused }
+}
+
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     let platform = Platform()
     let store = CorpusStore()
@@ -1698,7 +1771,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     var settings: SettingsWindow?
     var library: LibraryWindow?
     var status: NSStatusItem!
-    var mode = "idle"
+    var screenState: CaptureActivityState = .idle
+    var voiceState: CaptureActivityState = .idle
+    var screenBusy = false
+    var screenCount = 0
+    var voiceSeconds = 0
+    var activeCaptureGroup: String?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -1749,14 +1827,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         switch menuItem.action {
-        case #selector(startRecordAction), #selector(singleShotAction), #selector(startVoiceAction):
-            return mode == "idle"
+        case #selector(startRecordAction), #selector(singleShotAction):
+            return !screenBusy && !hasPausedCapture
+        case #selector(startVoiceAction):
+            return voiceState == .idle && !hasPausedCapture
         case #selector(pauseAction):
-            return mode == "recording" || mode == "voicing"
+            return screenState.isRunning || voiceState.isRunning
         case #selector(resumeAction):
-            return mode == "paused_recording" || mode == "paused_voice"
+            return hasPausedCapture
         case #selector(stopAction):
-            return mode != "idle"
+            return screenState.isActive || voiceState.isActive
         default:
             return true
         }
@@ -1771,10 +1851,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         hud.onStop = { [weak self] in self?.stopActive() }
         hud.onFolder = { [weak self] in self?.showLibrary() }
         hud.onHide = { [weak self] in self?.hud.hide() }
-        screen.onCount = { [weak self] n in self?.hud.setState("recording", count: "\(n)") }
-        screen.onDone = { [weak self] msg in self?.mode = "idle"; self?.hud.setState("idle"); self?.status.button?.toolTip = msg }
-        voice.onTick = { [weak self] s in self?.hud.setState("voicing", count: String(format: "%d:%02d", s/60, s%60)) }
-        voice.onDone = { [weak self] msg in self?.mode = "idle"; self?.hud.setState("idle"); self?.status.button?.toolTip = msg }
+        screen.onCount = { [weak self] n in
+            self?.screenCount = n
+            self?.updateHUD()
+        }
+        screen.onDone = { [weak self] msg in
+            guard let self else { return }
+            self.screenState = .idle
+            self.screenBusy = false
+            self.screenCount = 0
+            self.clearCaptureGroupIfIdle()
+            self.updateHUD()
+            self.status.button?.toolTip = msg
+        }
+        voice.onTick = { [weak self] s in
+            self?.voiceSeconds = s
+            self?.updateHUD()
+        }
+        voice.onDone = { [weak self] msg in
+            guard let self else { return }
+            self.voiceState = .idle
+            self.voiceSeconds = 0
+            self.clearCaptureGroupIfIdle()
+            self.updateHUD()
+            self.status.button?.toolTip = msg
+        }
     }
 
     @objc func showHUD() { hud.show() }
@@ -1798,56 +1899,128 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc func resumeAction() { resumeActive() }
     @objc func stopAction() { stopActive() }
 
+    var hasPausedCapture: Bool {
+        screenState.isPaused || voiceState.isPaused
+    }
+
+    func ensureCaptureGroup() -> String {
+        if let activeCaptureGroup {
+            return activeCaptureGroup
+        }
+        let group = uniqueID("group")
+        activeCaptureGroup = group
+        return group
+    }
+
+    func clearCaptureGroupIfIdle() {
+        if !screenState.isActive && !voiceState.isActive {
+            activeCaptureGroup = nil
+        }
+    }
+
+    func formattedVoiceSeconds() -> String {
+        String(format: "%d:%02d", voiceSeconds / 60, voiceSeconds % 60)
+    }
+
+    func hudCounterValue() -> String {
+        if screenState.isActive && voiceState.isActive {
+            return "\(screenCount)/\(formattedVoiceSeconds())"
+        }
+        if screenState.isActive {
+            return "\(screenCount)"
+        }
+        if voiceState.isActive {
+            return formattedVoiceSeconds()
+        }
+        return ""
+    }
+
+    func updateHUD() {
+        let state: String
+        if hasPausedCapture {
+            state = "paused"
+        } else if screenState.isRunning && voiceState.isRunning {
+            state = "both"
+        } else if screenState.isRunning {
+            state = "recording"
+        } else if voiceState.isRunning {
+            state = "voicing"
+        } else {
+            state = "idle"
+        }
+        hud.setState(state, count: hudCounterValue())
+    }
+
     func startRecord() {
+        guard !screenBusy, !hasPausedCapture else { return }
         guard platform.screenGranted(), platform.accessibilityGranted() else { showSettings(); return }
-        mode = "recording"
-        hud.setState("recording", count: "0")
-        screen.start()
+        screenState = .running
+        screenBusy = true
+        screenCount = 0
+        updateHUD()
+        screen.start(captureGroup: ensureCaptureGroup())
     }
 
     func singleShot() {
+        guard !screenBusy, !hasPausedCapture else { return }
         guard platform.screenGranted(), platform.accessibilityGranted() else { showSettings(); return }
-        screen.single()
+        screenBusy = true
+        let captureGroup = voiceState.isActive ? ensureCaptureGroup() : nil
+        screen.single(captureGroup: captureGroup)
     }
 
     func startVoice() {
+        guard voiceState == .idle, !hasPausedCapture else { return }
         platform.requestMic { [weak self] granted in
             guard let self else { return }
             guard granted else { self.showSettings(); return }
-            self.mode = "voicing"
-            self.hud.setState("voicing", count: "0:00")
-            self.voice.start()
+            guard self.voiceState == .idle, !self.hasPausedCapture else { return }
+            self.voiceState = .running
+            self.voiceSeconds = 0
+            self.updateHUD()
+            self.voice.start(captureGroup: self.ensureCaptureGroup())
         }
     }
 
     func pauseActive() {
-        if mode == "recording" {
+        var pausedAny = false
+        if screenState.isRunning {
             screen.pause()
-            mode = "paused_recording"
-            hud.setState("paused", count: "II")
-        } else if mode == "voicing" {
+            screenState = .paused
+            pausedAny = true
+        }
+        if voiceState.isRunning {
             voice.pause()
-            mode = "paused_voice"
-            hud.setState("paused", count: "II")
+            voiceState = .paused
+            pausedAny = true
+        }
+        if pausedAny {
+            updateHUD()
         }
     }
 
     func resumeActive() {
-        if mode == "paused_recording" {
-            mode = "recording"
-            hud.setState("recording", count: "")
+        var resumedAny = false
+        if screenState.isPaused {
+            screenState = .running
             screen.resume()
-        } else if mode == "paused_voice" {
-            mode = "voicing"
-            hud.setState("voicing", count: "")
+            resumedAny = true
+        }
+        if voiceState.isPaused {
+            voiceState = .running
             voice.resume()
+            resumedAny = true
+        }
+        if resumedAny {
+            updateHUD()
         }
     }
 
     func stopActive() {
-        if mode == "recording" || mode == "paused_recording" {
+        if screenState.isActive {
             screen.stop()
-        } else if mode == "voicing" || mode == "paused_voice" {
+        }
+        if voiceState.isActive {
             voice.stop()
         }
     }

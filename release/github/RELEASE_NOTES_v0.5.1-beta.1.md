@@ -7,6 +7,9 @@ This is a focused bugfix release for the macOS HUD bar and local beta signing be
 - Fixed the HUD bar not returning above full-screen apps after clicking the HUD hide button and then choosing "Show HUD" from the macOS menu bar.
 - The HUD now reapplies full-screen/Space floating behavior whenever it is shown.
 - The hide button no longer removes the HUD panel from the window stack; it makes the HUD transparent and non-interactive so showing it again preserves the floating behavior more reliably.
+- Voice notes and screen collection can now run at the same time. While recording audio, users can still take a one-off screenshot or start continuous screen sampling; while sampling the screen, users can still start a voice note.
+- Screen and voice entries captured during the same live session now share a `capture_group` value so MyRAG can connect them later.
+- The corpus library now displays entry times in the Mac's current system time zone instead of showing raw UTC timestamps.
 
 ## Signing
 
