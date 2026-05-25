@@ -55,6 +55,21 @@ The current beta is open source but not Apple Developer ID signed or notarized. 
 
 The app currently uses a self-signed local stable signing identity for local beta builds. That is better than ad-hoc signing for local permission stability, but it is not the same as Apple Developer ID signing.
 
+Normal beta install flow:
+
+1. Drag `FreeRAG.app` into `/Applications`.
+2. Try to open it once.
+3. If macOS blocks it, open System Settings > Privacy & Security > Open Anyway.
+
+If that button is not visible, this targeted command removes the download quarantine flag from the installed app copy:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/FreeRAG.app
+open /Applications/FreeRAG.app
+```
+
+Do not disable Gatekeeper globally.
+
 ## Why do permissions sometimes look enabled but not work?
 
 macOS TCC permissions are tied to app identity, signing, and location. If you run different copies of the app, move it around, or switch from an ad-hoc build to a signed build, macOS may show confusing stale permission state.

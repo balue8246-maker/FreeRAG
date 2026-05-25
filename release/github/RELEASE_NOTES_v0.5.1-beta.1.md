@@ -17,6 +17,7 @@ This is a focused bugfix release for the macOS HUD bar and local beta signing be
 ## Packaging and Docs
 
 - The DMG now uses a guided Finder layout with background labels for the app, Applications shortcut, product overview, README, MyRAG skill, and assets.
+- The DMG README now includes the short macOS beta install path and clearly states that the beta is not Apple Developer ID signed or notarized.
 - MyRAG docs are split into the runtime `SKILL.md` and `INSTALL_ADAPTERS.md` for model-specific Vision / ASR setup.
 
 ## Assets

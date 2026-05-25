@@ -44,8 +44,20 @@ Contents:
 Install:
 1. Drag FreeRAG.app onto Applications.
 2. Launch FreeRAG from Applications so macOS permissions stay tied to a stable app location.
-3. Open Product Overview.html if you want the product overview.
-4. Copy MyRAG skill/myrag into your Codex/Claude Code skill directory only when needed.
+3. If macOS says Apple cannot verify FreeRAG, click Done, then open System Settings > Privacy & Security > Open Anyway.
+4. Open Product Overview.html if you want the product overview.
+5. Copy MyRAG skill/myrag into your Codex/Claude Code skill directory only when needed.
+
+中文安装：
+1. 把 FreeRAG.app 拖到 Applications。
+2. 从 Applications 启动，避免权限绑定到临时位置。
+3. 如果 macOS 提示“Apple 无法验证 FreeRAG”，点“完成”，再到 系统设置 > 隐私与安全性 > 仍要打开。
+
+Open Source Beta:
+FreeRAG is distributed through GitHub Releases as a DMG. This beta is not Apple Developer ID signed or notarized, so the first launch may require manual approval in macOS settings.
+
+开源 Beta：
+FreeRAG 通过 GitHub Release 发布 DMG。当前 beta 尚未使用 Apple Developer ID 签名或公证，所以首次打开时可能需要在 macOS 设置里手动允许。
 
 MyRAG:
 FreeRAG collects raw local material. MyRAG reads it in Codex/Claude Code, summarizes by matter/item in the chat, and only marks raw as done after the user confirms the summary.

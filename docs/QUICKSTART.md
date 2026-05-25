@@ -25,6 +25,15 @@ The current beta is not Apple Developer ID signed or notarized. If macOS blocks 
 3. Scroll to the security warning.
 4. Choose Open Anyway.
 
+If "Open Anyway" is not visible, use this targeted quarantine removal after dragging the app to `/Applications`:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/FreeRAG.app
+open /Applications/FreeRAG.app
+```
+
+Do not disable Gatekeeper globally. The command above only removes the download quarantine flag from the installed FreeRAG app copy.
+
 ## 3. Grant Permissions
 
 FreeRAG may ask for:

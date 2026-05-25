@@ -6,6 +6,8 @@ It is built for people who use Codex / Claude Code and keep losing useful contex
 
 [简体中文说明](README.zh-CN.md)
 
+**Open Source Beta:** FreeRAG is distributed through GitHub Releases as a DMG. The current beta is not Apple Developer ID signed or notarized, so macOS may require you to approve the first launch in System Settings > Privacy & Security.
+
 <p>
   <a href="https://github.com/balue8246-maker/FreeRAG/releases/download/v0.5.1-beta.1/FreeRAG-0.5.1-build-3.dmg"><strong>Download DMG</strong></a>
   ·
@@ -90,9 +92,10 @@ Current app version: `0.5.1`, build `3`.
 1. Download the DMG from a GitHub Release.
 2. Drag `FreeRAG.app` to `/Applications`.
 3. Launch it from `/Applications` so macOS permissions stay tied to a stable app location.
-4. Grant Screen Recording, Accessibility, and Microphone permissions when needed.
-5. Copy the bundled `myrag` skill into your Codex / Claude Code skill directory if you want LLM-side corpus mining.
-6. If your current model cannot inspect images or transcribe recordings, follow `shared/skills/myrag/INSTALL_ADAPTERS.md` before using MyRAG on multimodal corpus entries.
+4. If macOS blocks the first launch, approve FreeRAG in System Settings > Privacy & Security > Open Anyway.
+5. Grant Screen Recording, Accessibility, and Microphone permissions when needed.
+6. Copy the bundled `myrag` skill into your Codex / Claude Code skill directory if you want LLM-side corpus mining.
+7. If your current model cannot inspect images or transcribe recordings, follow `shared/skills/myrag/INSTALL_ADAPTERS.md` before using MyRAG on multimodal corpus entries.
 
 ## Local Corpus
 
