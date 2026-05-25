@@ -62,6 +62,8 @@ FreeRAG/
   Resources/Assets/           app 图标和状态栏图标
   Sources/main.swift          Swift/AppKit 主实现
 shared/skills/myrag/          MyRAG skill 和本地语料辅助脚本
+shared/skills/myrag/INSTALL_ADAPTERS.md
+                              不同模型环境的图片 / 语音适配说明
 docs/                         产品文档、公开状态和产品介绍页
 release/github/               GitHub 发布计划、清单、release notes
 ```

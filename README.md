@@ -62,6 +62,8 @@ FreeRAG/
   Resources/Assets/           App icon and status assets.
   Sources/main.swift          Swift/AppKit app implementation.
 shared/skills/myrag/          MyRAG skill and local corpus helper script.
+shared/skills/myrag/INSTALL_ADAPTERS.md
+                              Vision / ASR setup for different model environments.
 docs/                         Product docs, public status, and overview pages.
 release/github/               GitHub publication plan, checklist, release notes.
 ```

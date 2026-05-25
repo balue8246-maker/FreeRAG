@@ -16,6 +16,8 @@ Not exactly. FreeRAG uses screenshots as raw evidence, but the product goal is l
 
 MyRAG is the bundled LLM-side workflow. It reads the local corpus in Codex / Claude Code, folds repeated material, groups entries by matter, and summarizes evidence in the chat.
 
+If your model cannot read images or transcribe audio, configure a Vision or ASR backend with `shared/skills/myrag/INSTALL_ADAPTERS.md`.
+
 ## Does FreeRAG upload my screenshots, clipboard, or recordings?
 
 No. FreeRAG does not upload raw material by itself. It writes to your local `~/Documents/Corpus/` folder.
@@ -99,4 +101,3 @@ Yes, but the intended flow is:
 4. FreeRAG cleanup removes only marked raw directories.
 
 `processed/` is not deleted by FreeRAG cleanup.
-

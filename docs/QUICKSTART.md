@@ -70,6 +70,12 @@ Raw entries usually include `_meta.json`, `llm_context.md`, and the original mat
 
 The DMG includes a `myrag` skill folder. Copy it into your Codex / Claude Code skill directory if you want LLM-side corpus mining.
 
+If your current LLM environment cannot read images or transcribe audio, follow the adapter guide:
+
+```text
+shared/skills/myrag/INSTALL_ADAPTERS.md
+```
+
 Useful local commands:
 
 ```bash
@@ -114,4 +120,3 @@ python3 shared/skills/myrag/scripts/myrag_search.py --image-clusters 20
 ### I do not want FreeRAG to collect clipboard material
 
 This beta starts clipboard collection automatically. Do not run the app around sensitive clipboard workflows unless you are comfortable with local raw material being saved under `~/Documents/Corpus/`.
-
