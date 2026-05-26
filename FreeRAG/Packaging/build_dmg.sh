@@ -16,53 +16,47 @@ if [ ! -d "$APP" ]; then
 fi
 
 rm -rf "$STAGE" "$DMG" "$TMP_DMG"
-mkdir -p "$STAGE/MyRAG skill" "$STAGE/assets" "$STAGE/.background"
+mkdir -p "$STAGE/MyRAG skill" "$STAGE/.background"
 
 ditto "$APP" "$STAGE/FreeRAG.app"
 ln -s /Applications "$STAGE/Applications"
 ditto "$ROOT/shared/skills/myrag" "$STAGE/MyRAG skill/myrag"
-ditto "$ROOT/docs/assets" "$STAGE/assets"
-ditto "$ROOT/docs/product_overview.html" "$STAGE/Product Overview.html"
-ditto "$ROOT/docs/product_overview.en.html" "$STAGE/assets/product_overview.en.html"
-ditto "$ROOT/docs/product_overview.zh-CN.html" "$STAGE/assets/product_overview.zh-CN.html"
 if [ -f "$BACKGROUND" ]; then
   cp "$BACKGROUND" "$STAGE/.background/background.png"
 fi
-perl -0pi -e 's/href="product_overview\.en\.html"/href="assets\/product_overview.en.html"/g; s/href="product_overview\.zh-CN\.html"/href="assets\/product_overview.zh-CN.html"/g' "$STAGE/Product Overview.html"
 
-cat > "$STAGE/README.txt" <<EOF
+cat > "$STAGE/Install Guide.txt" <<EOF
 FreeRAG ${VERSION} (${BUILD})
 
 Contents:
 - FreeRAG.app
 - Applications shortcut
-- Product Overview.html
-- README.txt
+- Install Guide.txt
 - MyRAG skill/myrag
-- assets/
 
 Install:
 1. Drag FreeRAG.app onto Applications.
 2. Launch FreeRAG from Applications so macOS permissions stay tied to a stable app location.
 3. If macOS says Apple cannot verify FreeRAG, click Done, then open System Settings > Privacy & Security > Open Anyway.
-4. Open Product Overview.html if you want the product overview.
-5. Copy MyRAG skill/myrag into your Codex/Claude Code skill directory only when needed.
+4. Copy MyRAG skill/myrag into your Codex/Claude Code skill directory only when needed.
 
 中文安装：
 1. 把 FreeRAG.app 拖到 Applications。
 2. 从 Applications 启动，避免权限绑定到临时位置。
 3. 如果 macOS 提示“Apple 无法验证 FreeRAG”，点“完成”，再到 系统设置 > 隐私与安全性 > 仍要打开。
+4. 如需 MyRAG，把 MyRAG skill/myrag 复制到 Codex / Claude Code 的 skill 目录。
+
+MyRAG skill install:
+- Codex: copy MyRAG skill/myrag into your Codex skills directory.
+- Claude Code: copy MyRAG skill/myrag into your Claude Code skills directory.
+- Use SKILL.md for normal corpus mining.
+- Use INSTALL_ADAPTERS.md only when your model needs Vision/OCR or ASR setup.
 
 Open Source Beta:
 FreeRAG is distributed through GitHub Releases as a DMG. This beta is not Apple Developer ID signed or notarized, so the first launch may require manual approval in macOS settings.
 
 开源 Beta：
 FreeRAG 通过 GitHub Release 发布 DMG。当前 beta 尚未使用 Apple Developer ID 签名或公证，所以首次打开时可能需要在 macOS 设置里手动允许。
-
-MyRAG:
-FreeRAG collects raw local material. MyRAG reads it in Codex/Claude Code, summarizes by matter/item in the chat, and only marks raw as done after the user confirms the summary.
-Use MyRAG skill/myrag/SKILL.md for normal corpus mining.
-Use MyRAG skill/myrag/INSTALL_ADAPTERS.md only when your model needs Vision/OCR or ASR setup for images, screenshots, or recordings.
 
 Permissions:
 macOS permissions are tied mainly to bundle id, signing identity, and app location.
@@ -89,29 +83,28 @@ if [ -d "$MOUNT_DIR/.background" ]; then
 fi
 
 osascript <<EOF
+set mountPath to "$MOUNT_DIR"
 tell application "Finder"
-  tell disk "FreeRAG ${VERSION}"
-    open
-    set current view of container window to icon view
-    set toolbar visible of container window to false
-    set statusbar visible of container window to false
-    set the bounds of container window to {120, 120, 980, 660}
-    set viewOptions to the icon view options of container window
-    set arrangement of viewOptions to not arranged
-    set icon size of viewOptions to 72
-    set background picture of viewOptions to file ".background:background.png"
-    set position of item "FreeRAG.app" of container window to {170, 184}
-    set position of item "Applications" of container window to {690, 184}
-    set position of item "Product Overview.html" of container window to {122, 366}
-    set position of item "README.txt" of container window to {314, 366}
-    set position of item "MyRAG skill" of container window to {506, 366}
-    set position of item "assets" of container window to {698, 366}
-    close
-    open
-    update without registering applications
-    delay 1
-    close
+  set dmgFolder to POSIX file mountPath as alias
+  open dmgFolder
+  delay 0.2
+  set current view of container window of dmgFolder to icon view
+  set toolbar visible of container window of dmgFolder to false
+  set statusbar visible of container window of dmgFolder to false
+  set the bounds of container window of dmgFolder to {120, 120, 980, 700}
+  set viewOptions to the icon view options of container window of dmgFolder
+  tell viewOptions
+    set arrangement to not arranged
+    set icon size to 72
   end tell
+  set background picture of viewOptions to file ".background:background.png" of dmgFolder
+  set position of item "FreeRAG.app" of dmgFolder to {170, 212}
+  set position of item "Applications" of dmgFolder to {690, 212}
+  set position of item "Install Guide.txt" of dmgFolder to {255, 390}
+  set position of item "MyRAG skill" of dmgFolder to {535, 390}
+  update dmgFolder without registering applications
+  delay 1
+  close container window of dmgFolder
 end tell
 EOF
 

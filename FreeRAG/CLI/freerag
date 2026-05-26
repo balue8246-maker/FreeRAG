@@ -1,0 +1,431 @@
+#!/usr/bin/env python3
+import argparse
+import fcntl
+import json
+import os
+import shutil
+import subprocess
+import sys
+import uuid
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Optional
+
+
+CORPUS = Path(os.environ.get("FREERAG_CORPUS", str(Path.home() / "Documents" / "Corpus"))).expanduser()
+SCREEN_ROOT = CORPUS / "screen"
+CLIP_ROOT = CORPUS / "clipboard"
+VOICE_ROOT = CORPUS / "voice"
+PROCESSED_ROOT = CORPUS / "processed"
+INDEX = CORPUS / "_index.json"
+LIBRARY = CORPUS / "_library.json"
+RAW_PROCESSED_MARKER = "_myrag_done.json"
+
+
+def now_iso() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def display_local_time(raw: str) -> str:
+    if not raw:
+        return ""
+    try:
+        date = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return raw[:16].replace("T", " ")
+    return date.astimezone().strftime("%Y-%m-%d %H:%M")
+
+
+def unique_id(suffix: Optional[str] = None) -> str:
+    base = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
+    tail = uuid.uuid4().hex[:6]
+    return f"{base}_{tail}_{suffix}" if suffix else f"{base}_{tail}"
+
+
+def ensure_dir(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+
+
+def write_json(obj, path: Path) -> None:
+    ensure_dir(path.parent)
+    path.write_text(json.dumps(obj, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def read_json(path: Path, fallback):
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return fallback
+
+
+def relative_to_corpus(path: Path) -> str:
+    return str(path.relative_to(CORPUS)).replace(os.sep, "/")
+
+
+def load_entries() -> list[dict]:
+    data = read_json(INDEX, {"entries": []})
+    return data.get("entries", []) if isinstance(data, dict) else []
+
+
+def normalized_library_entries(entries: list[dict]) -> list[dict]:
+    out = []
+    for entry in entries:
+        entry_id = str(entry.get("id", ""))
+        rel_path = str(entry.get("path", ""))
+        out.append({
+            "id": entry_id,
+            "type": str(entry.get("type", "")),
+            "subtype": str(entry.get("subtype", "")),
+            "time": str(entry.get("time", "")),
+            "title": str(entry.get("title", "")),
+            "summary": str(entry.get("summary", "")),
+            "path": rel_path,
+            "llm_context": f"{rel_path}llm_context.md" if rel_path else "",
+            "processed_path": f"processed/{entry_id}/",
+            "capture_group": str(entry.get("capture_group", "")),
+            "role": "raw",
+            "tags": entry.get("tags", []) if isinstance(entry.get("tags", []), list) else [],
+        })
+    return out
+
+
+def write_corpus_readme() -> None:
+    readme = CORPUS / "README_FOR_LLM.md"
+    if readme.exists() and "MyRAG skill" in readme.read_text(encoding="utf-8", errors="ignore"):
+        return
+    body = """# FreeRAG Corpus
+
+This directory contains local raw material collected by FreeRAG.
+
+Raw material lives under:
+- `screen/`
+- `clipboard/`
+- `voice/`
+
+Processed summaries, OCR, transcripts, timelines, and facts can live under `processed/`.
+MyRAG should summarize material in chat first, and mark raw entries with `_myrag_done.json`
+only after the user confirms the raw evidence has been taken over.
+"""
+    readme.write_text(body, encoding="utf-8")
+
+
+def write_index_and_library(entries: list[dict]) -> None:
+    ensure_dir(CORPUS)
+    ensure_dir(PROCESSED_ROOT)
+    write_corpus_readme()
+    updated = now_iso()
+    write_json({"updated": updated, "entries": entries}, INDEX)
+    write_json({
+        "schema": "freerag.library.v1",
+        "updated": updated,
+        "root": str(CORPUS),
+        "raw_roots": ["screen/", "clipboard/", "voice/"],
+        "processed_root": "processed/",
+        "processed_marker": RAW_PROCESSED_MARKER,
+        "entries": normalized_library_entries(entries),
+    }, LIBRARY)
+
+
+def add_entry(entry: dict) -> None:
+    ensure_dir(CORPUS)
+    lock_path = CORPUS / ".freerag_cli.lock"
+    with lock_path.open("a+", encoding="utf-8") as lock_file:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+        try:
+            entries = load_entries()
+            entries.insert(0, entry)
+            write_index_and_library(entries)
+        finally:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
+
+def write_llm_context(title: str, entry_type: str, summary: str, files: list[str], directory: Path, capture_group: Optional[str] = None) -> None:
+    entry_id = directory.name
+    processed_path = f"processed/{entry_id}/"
+    file_list = "\n".join(f"- `{name}`" for name in files) if files else "- None"
+    capture_group_line = f"Capture group: {capture_group}\n" if capture_group else ""
+    body = f"""# {title}
+
+Entry ID: {entry_id}
+Type: {entry_type}
+Time: {now_iso()}
+Raw path: {directory}
+{capture_group_line}Optional processed path: {processed_path}
+
+## Summary
+{summary}
+
+## Files
+{file_list}
+
+## LLM Instructions
+
+This is raw evidence collected locally by FreeRAG. Treat these files as source material,
+not final knowledge. Prefer exact values from screenshots, clipboard files, audio, or
+transcripts over assumptions.
+"""
+    (directory / "llm_context.md").write_text(body, encoding="utf-8")
+
+
+def short_summary(text: str, limit: int = 150) -> str:
+    normalized = " ".join(text.strip().split())
+    return normalized[:limit]
+
+
+def command_note(args) -> int:
+    if args.stdin or (not args.text and not sys.stdin.isatty()):
+        text = sys.stdin.read()
+    else:
+        text = " ".join(args.text)
+    text = text.strip()
+    if not text:
+        print("freerag note: no text provided", file=sys.stderr)
+        return 2
+
+    entry_id = unique_id("text")
+    directory = CLIP_ROOT / entry_id
+    ensure_dir(directory)
+    (directory / "content.md").write_text(text + "\n", encoding="utf-8")
+    write_json({"time": now_iso(), "type": "text", "source": "freerag-cli", "length": len(text)}, directory / "_meta.json")
+    title = args.title or f"CLI note {entry_id}"
+    summary = short_summary(text, 500)
+    write_llm_context(title, "clipboard/text", summary, ["content.md", "_meta.json"], directory)
+    add_entry({
+        "id": entry_id,
+        "type": "clipboard",
+        "subtype": "text",
+        "time": now_iso(),
+        "title": title,
+        "tags": args.tag or [],
+        "summary": short_summary(text),
+        "path": f"clipboard/{entry_id}/",
+    })
+    print(relative_to_corpus(directory))
+    return 0
+
+
+def command_shot(args) -> int:
+    entry_id = unique_id("cli_screen")
+    directory = SCREEN_ROOT / entry_id
+    ensure_dir(directory)
+    image = directory / "001.png"
+    command = ["/usr/sbin/screencapture", "-x"]
+    if args.interactive:
+        command.append("-i")
+    command.append(str(image))
+    result = subprocess.run(command, text=True)
+    if result.returncode != 0 or not image.exists():
+        shutil.rmtree(directory, ignore_errors=True)
+        print("freerag shot: screencapture failed. Grant Screen Recording to the calling terminal if needed.", file=sys.stderr)
+        return result.returncode or 1
+
+    capture_time = now_iso()
+    captures = [{"seq": 1, "file": "001.png", "title": args.title or "CLI screenshot", "time": capture_time}]
+    write_json(captures, directory / "captures.json")
+    write_json({
+        "session": entry_id,
+        "time": capture_time,
+        "count": 1,
+        "deduped": 0,
+        "storyboards": [],
+        "titles": [args.title or "CLI screenshot"],
+        "summary": "1 screenshot collected by FreeRAG CLI",
+        "platform": "macos-cli",
+    }, directory / "_meta.json")
+    title = args.title or "CLI screenshot"
+    write_llm_context(title, "screen", "One screenshot collected by FreeRAG CLI.", ["001.png", "captures.json", "_meta.json"], directory)
+    add_entry({
+        "id": entry_id,
+        "type": "screen",
+        "time": capture_time,
+        "title": title,
+        "tags": args.tag or [],
+        "summary": "1 screenshot collected by FreeRAG CLI",
+        "path": f"screen/{entry_id}/",
+    })
+    print(relative_to_corpus(directory))
+    return 0
+
+
+def convert_image_to_png(source: Path, target: Path) -> bool:
+    if source.suffix.lower() == ".png":
+        shutil.copy2(source, target)
+        return True
+    result = subprocess.run(["/usr/bin/sips", "-s", "format", "png", str(source), "--out", str(target)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return result.returncode == 0 and target.exists()
+
+
+def command_image(args) -> int:
+    source = Path(args.path).expanduser()
+    if not source.exists() or not source.is_file():
+        print(f"freerag image: not a file: {source}", file=sys.stderr)
+        return 2
+    entry_id = unique_id("image")
+    directory = CLIP_ROOT / entry_id
+    ensure_dir(directory)
+    target = directory / "image.png"
+    if not convert_image_to_png(source, target):
+        shutil.rmtree(directory, ignore_errors=True)
+        print("freerag image: failed to convert image to PNG with sips", file=sys.stderr)
+        return 1
+    (directory / "content.md").write_text("![CLI image](image.png)\n", encoding="utf-8")
+    write_json({
+        "time": now_iso(),
+        "type": "image",
+        "source": "freerag-cli",
+        "source_path": str(source),
+    }, directory / "_meta.json")
+    title = args.title or f"CLI image {entry_id}"
+    write_llm_context(title, "clipboard/image", "Image imported by FreeRAG CLI for later OCR or visual reading.", ["image.png", "content.md", "_meta.json"], directory)
+    add_entry({
+        "id": entry_id,
+        "type": "clipboard",
+        "subtype": "image",
+        "time": now_iso(),
+        "title": title,
+        "tags": args.tag or [],
+        "summary": "Image imported by FreeRAG CLI",
+        "path": f"clipboard/{entry_id}/",
+    })
+    print(relative_to_corpus(directory))
+    return 0
+
+
+def command_voice(args) -> int:
+    source = Path(args.path).expanduser()
+    if not source.exists() or not source.is_file():
+        print(f"freerag voice: not a file: {source}", file=sys.stderr)
+        return 2
+    if source.suffix.lower() != ".wav":
+        print("freerag voice: first CLI version accepts WAV files only", file=sys.stderr)
+        return 2
+    entry_id = unique_id("voice")
+    directory = VOICE_ROOT / entry_id
+    ensure_dir(directory)
+    shutil.copy2(source, directory / "recording.wav")
+    write_json({
+        "time": now_iso(),
+        "source": "freerag-cli",
+        "source_path": str(source),
+        "format": "wav",
+    }, directory / "_meta.json")
+    (directory / "transcript.md").write_text(f"# Voice {entry_id}\n\n*(pending transcription)*\n", encoding="utf-8")
+    title = args.title or f"CLI voice {entry_id}"
+    write_llm_context(title, "voice", "Voice recording imported by FreeRAG CLI. Transcription can be added later by MyRAG or an ASR adapter.", ["recording.wav", "transcript.md", "_meta.json"], directory)
+    add_entry({
+        "id": entry_id,
+        "type": "voice",
+        "time": now_iso(),
+        "title": title,
+        "tags": args.tag or [],
+        "summary": "Voice recording imported by FreeRAG CLI",
+        "path": f"voice/{entry_id}/",
+    })
+    print(relative_to_corpus(directory))
+    return 0
+
+
+def load_library_entries() -> list[dict]:
+    source = LIBRARY if LIBRARY.exists() else INDEX
+    data = read_json(source, {"entries": []})
+    return data.get("entries", []) if isinstance(data, dict) else []
+
+
+def command_list(args) -> int:
+    entries = load_library_entries()
+    if args.type:
+        entries = [entry for entry in entries if entry.get("type") == args.type]
+    entries = entries[:args.limit]
+    if args.json:
+        print(json.dumps(entries, ensure_ascii=False, indent=2))
+        return 0
+    for entry in entries:
+        print(f"{display_local_time(str(entry.get('time', ''))):16}  {entry.get('type', ''):9}  {entry.get('path', ''):48}  {entry.get('summary', '')}")
+    return 0
+
+
+def command_latest(args) -> int:
+    entries = load_library_entries()
+    if args.type:
+        entries = [entry for entry in entries if entry.get("type") == args.type]
+    if not entries:
+        print("freerag latest: no entries", file=sys.stderr)
+        return 1
+    entry = entries[0]
+    path = CORPUS / str(entry.get("path", ""))
+    if args.json:
+        print(json.dumps(entry, ensure_ascii=False, indent=2))
+    else:
+        print(path)
+    if args.open:
+        subprocess.run(["/usr/bin/open", str(path)])
+    return 0
+
+
+def command_status(_args) -> int:
+    entries = load_library_entries()
+    counts: dict[str, int] = {}
+    for entry in entries:
+        counts[str(entry.get("type", ""))] = counts.get(str(entry.get("type", "")), 0) + 1
+    print(f"corpus: {CORPUS}")
+    print(f"entries: {len(entries)}")
+    for key in sorted(counts):
+        print(f"{key or 'unknown'}: {counts[key]}")
+    return 0
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="freerag", description="Offline FreeRAG CLI for writing and inspecting the local corpus.")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    note = sub.add_parser("note", help="Save text as a local corpus note.")
+    note.add_argument("text", nargs="*")
+    note.add_argument("--stdin", action="store_true", help="Read note text from stdin.")
+    note.add_argument("--title")
+    note.add_argument("--tag", action="append")
+    note.set_defaults(func=command_note)
+
+    shot = sub.add_parser("shot", help="Capture a screenshot into the corpus.")
+    shot.add_argument("--interactive", "-i", action="store_true", help="Use interactive macOS screenshot selection.")
+    shot.add_argument("--title")
+    shot.add_argument("--tag", action="append")
+    shot.set_defaults(func=command_shot)
+
+    image = sub.add_parser("image", help="Import an image into the corpus as clipboard/image.")
+    image.add_argument("path")
+    image.add_argument("--title")
+    image.add_argument("--tag", action="append")
+    image.set_defaults(func=command_image)
+
+    voice = sub.add_parser("voice", help="Import a WAV recording into the corpus.")
+    voice.add_argument("path")
+    voice.add_argument("--title")
+    voice.add_argument("--tag", action="append")
+    voice.set_defaults(func=command_voice)
+
+    list_cmd = sub.add_parser("list", help="List recent corpus entries.")
+    list_cmd.add_argument("--limit", type=int, default=10)
+    list_cmd.add_argument("--type", choices=["screen", "clipboard", "voice"])
+    list_cmd.add_argument("--json", action="store_true")
+    list_cmd.set_defaults(func=command_list)
+
+    latest = sub.add_parser("latest", help="Print the latest corpus entry path.")
+    latest.add_argument("--type", choices=["screen", "clipboard", "voice"])
+    latest.add_argument("--json", action="store_true")
+    latest.add_argument("--open", action="store_true", help="Open latest entry in Finder.")
+    latest.set_defaults(func=command_latest)
+
+    status = sub.add_parser("status", help="Show corpus path and entry counts.")
+    status.set_defaults(func=command_status)
+
+    return parser
+
+
+def main(argv: Optional[list[str]] = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    return args.func(args)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

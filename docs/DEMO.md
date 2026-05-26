@@ -61,7 +61,7 @@ You can:
 - search title, summary, and `llm_context.md`;
 - open an entry;
 - reveal it in Finder;
-- clean raw entries that MyRAG has already marked as processed.
+- move raw entries that MyRAG has already marked as processed into `_trash/`.
 
 ## Step 3. Mine With MyRAG
 
@@ -102,7 +102,7 @@ Only after the user confirms that a raw entry has been taken over should MyRAG w
 screen|clipboard|voice/<entry_id>/_myrag_done.json
 ```
 
-FreeRAG's cleanup action only deletes raw directories with that marker. It does not delete `processed/`.
+FreeRAG's cleanup action only moves raw directories with that marker into `_trash/`. It does not delete `processed/`.
 
 ## What This Demo Proves
 

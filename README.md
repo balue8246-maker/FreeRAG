@@ -66,6 +66,7 @@ MyRAG output is table-first: one matter per row, with facts, numbers, people/pro
 
 ```text
 FreeRAG/
+  CLI/                       Offline command-line helper for agent/script writes.
   Packaging/                 Build scripts for the native app and DMG.
   Resources/Assets/           App icon and status assets.
   Sources/main.swift          Swift/AppKit app implementation.
@@ -86,6 +87,24 @@ FreeRAG/Packaging/build_dmg.sh
 Local build output goes to `dist/`. `dist/` is intentionally ignored by Git; public binaries should be attached to GitHub Releases instead of committed to the source repository.
 
 Current app version: `0.5.1`, build `3`.
+
+## CLI
+
+FreeRAG also includes a lightweight offline CLI for agent and script workflows. It does not control the running menu bar app; it writes directly to the same local corpus schema.
+
+```bash
+FreeRAG/CLI/freerag note "Remember this local context"
+FreeRAG/CLI/freerag note --stdin < notes.md
+FreeRAG/CLI/freerag shot
+FreeRAG/CLI/freerag image ./reference.png
+FreeRAG/CLI/freerag voice ./recording.wav
+FreeRAG/CLI/freerag list --limit 10
+FreeRAG/CLI/freerag latest --open
+```
+
+`freerag shot` calls macOS `screencapture`, so Screen Recording permission belongs to the terminal or agent process that runs the CLI, not to `FreeRAG.app`.
+
+Set `FREERAG_CORPUS=/path/to/Corpus` to target a non-default corpus for tests or scripted workflows.
 
 ## Install
 

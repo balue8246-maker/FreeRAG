@@ -100,6 +100,22 @@ python3 shared/skills/myrag/scripts/myrag_search.py --image-clusters 20
 
 MyRAG should summarize by matter in the chat first. It should only mark raw material as processed after the user confirms that the evidence has been taken over.
 
+## 7. Optional CLI
+
+For agent or script workflows, FreeRAG includes an offline CLI that writes directly to the same local corpus:
+
+```bash
+FreeRAG/CLI/freerag note "A local note for later MyRAG mining"
+FreeRAG/CLI/freerag shot
+FreeRAG/CLI/freerag image ./reference.png
+FreeRAG/CLI/freerag list --limit 10
+FreeRAG/CLI/freerag latest --open
+```
+
+The CLI does not control the running menu bar app. `freerag shot` uses macOS `screencapture`, so Screen Recording permission belongs to the terminal or agent process that runs the command.
+
+Set `FREERAG_CORPUS=/path/to/Corpus` when you want the CLI to write into a test corpus instead of the default `~/Documents/Corpus/`.
+
 ## Troubleshooting
 
 ### The app says a permission is not active, but macOS shows it is enabled

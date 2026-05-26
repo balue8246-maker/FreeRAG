@@ -29,6 +29,20 @@ No. FreeRAG does not upload raw material by itself. It writes to your local `~/D
 
 If you ask Codex, Claude Code, or another LLM tool to read that corpus, then that tool's own privacy boundary applies.
 
+## Can agents control FreeRAG from the command line?
+
+The first CLI layer is offline: `FreeRAG/CLI/freerag` writes directly to `~/Documents/Corpus/` and updates the same `_index.json` / `_library.json` files used by the app.
+
+Examples:
+
+```bash
+FreeRAG/CLI/freerag note "Save this context"
+FreeRAG/CLI/freerag shot
+FreeRAG/CLI/freerag list --limit 10
+```
+
+This CLI does not control the running menu bar app. Commands that capture the screen use the terminal or agent process's macOS permissions.
+
 ## Where is the data stored?
 
 ```text
@@ -119,6 +133,6 @@ Yes, but the intended flow is:
 1. MyRAG summarizes the relevant material.
 2. The user confirms the raw evidence has been taken over.
 3. MyRAG writes `_myrag_done.json`.
-4. FreeRAG cleanup removes only marked raw directories.
+4. FreeRAG cleanup moves only marked raw directories to `~/Documents/Corpus/_trash/`.
 
-`processed/` is not deleted by FreeRAG cleanup.
+`processed/` is not deleted by FreeRAG cleanup, and moved raw material remains recoverable from `_trash/`.

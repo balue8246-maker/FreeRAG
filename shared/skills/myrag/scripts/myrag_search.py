@@ -551,16 +551,68 @@ def init_processed(entry_id: str) -> dict:
     return {"条目id": entry_id, "目录": str(root), "已创建": written, "已存在": skipped}
 
 
-def mark_processed(entry_id: str, note: str = "") -> dict:
-    entries, _ = load_index()
-    entry = next((e for e in entries if str(e.get("id", "")) == entry_id), None)
-    if not entry:
-        return {"错误": f"没有找到条目: {entry_id}"}
+VOICE_TRANSCRIPT_PENDING_MARKERS = (
+    "待转译",
+    "待转写",
+    "待转录",
+    "未转译",
+    "未转写",
+    "无转写",
+    "pending transcription",
+    "transcription pending",
+    "not transcribed",
+    "本地未配置可用语音转写后端",
+)
 
+VOICE_TRANSCRIPT_TEMPLATE_LINES = {
+    "音频转写",
+    "原始转写",
+    "说话意图与行动项",
+    "当前状态",
+    "保留文件",
+    "原 transcript.md",
+    "自动处理结果",
+}
+
+
+def meaningful_transcript_text(text: str) -> str:
+    lines = []
+    for raw_line in text.splitlines():
+        line = raw_line.strip().strip("#").strip()
+        if not line or line in VOICE_TRANSCRIPT_TEMPLATE_LINES:
+            continue
+        lower = line.lower()
+        if any(marker.lower() in lower for marker in VOICE_TRANSCRIPT_PENDING_MARKERS):
+            continue
+        if line.startswith("- `processed/") or line in {"- 无", "无"}:
+            continue
+        lines.append(line)
+    return "\n".join(lines).strip()
+
+
+def voice_mark_block_reason(entry: dict) -> str:
+    if entry.get("type") != "voice":
+        return ""
+    entry_id = str(entry.get("id", ""))
+    raw_root = entry_dir(entry)
+    candidates = [
+        raw_root / "transcript.md",
+        processed_dir(entry_id) / "transcript.md",
+    ]
+    for path in candidates:
+        text = read_text(path, 20000)
+        if meaningful_transcript_text(text):
+            return ""
+    if not (raw_root / "recording.wav").exists():
+        return "voice 条目没有 recording.wav，也没有可用 transcript。"
+    return "voice 条目尚无可用 transcript，拒绝写 _myrag_done.json；先转写并给用户 summary，或显式使用 --force-mark-voice。"
+
+
+def raw_processed_payload(entry: dict, note: str) -> dict:
+    entry_id = str(entry.get("id", ""))
     raw_root = entry_dir(entry)
     processed_root = processed_dir(entry_id)
-    processed_root.mkdir(parents=True, exist_ok=True)
-    payload = {
+    return {
         "schema": "myrag.raw_processed_marker.v1",
         "entry_id": entry_id,
         "status": "processed",
@@ -571,6 +623,17 @@ def mark_processed(entry_id: str, note: str = "") -> dict:
         "status_file_for": "MyRAG 自己记录处理状态，FreeRAG 不读取 processed 状态",
         "note": note,
     }
+
+
+def write_processed_marker_for_entry(entry: dict, note: str, force_mark_voice: bool = False) -> list[str]:
+    reason = voice_mark_block_reason(entry)
+    if reason and not force_mark_voice:
+        raise ValueError(reason)
+    entry_id = str(entry.get("id", ""))
+    raw_root = entry_dir(entry)
+    processed_root = processed_dir(entry_id)
+    processed_root.mkdir(parents=True, exist_ok=True)
+    payload = raw_processed_payload(entry, note)
     written = []
     if raw_root.exists():
         raw_marker = raw_root / RAW_PROCESSED_MARKER
@@ -579,7 +642,23 @@ def mark_processed(entry_id: str, note: str = "") -> dict:
     status = processed_root / PROCESSED_STATUS
     status.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     written.append(str(status))
-    return {"条目id": entry_id, "状态": "已标记处理完成", "写入": written}
+    return written
+
+
+def mark_processed(entry_id: str, note: str = "", force_mark_voice: bool = False) -> dict:
+    entries, _ = load_index()
+    entry = next((e for e in entries if str(e.get("id", "")) == entry_id), None)
+    if not entry:
+        return {"错误": f"没有找到条目: {entry_id}"}
+
+    try:
+        written = write_processed_marker_for_entry(entry, note, force_mark_voice=force_mark_voice)
+    except ValueError as exc:
+        return {"条目id": entry_id, "状态": "拒绝标记", "错误": str(exc)}
+    payload = {"条目id": entry_id, "状态": "已标记处理完成", "写入": written}
+    if force_mark_voice and entry.get("type") == "voice":
+        payload["force_mark_voice"] = True
+    return payload
 
 
 def unique_raw_entries(entries: list[dict]) -> list[dict]:
@@ -649,33 +728,6 @@ def image_cluster_payload(cluster: dict) -> dict:
     }
 
 
-def write_processed_marker_for_entry(entry: dict, note: str) -> list[str]:
-    entry_id = str(entry.get("id", ""))
-    raw_root = entry_dir(entry)
-    processed_root = processed_dir(entry_id)
-    processed_root.mkdir(parents=True, exist_ok=True)
-    payload = {
-        "schema": "myrag.raw_processed_marker.v1",
-        "entry_id": entry_id,
-        "status": "processed",
-        "marked_at": datetime.now().isoformat(timespec="seconds"),
-        "raw_path": str(raw_root),
-        "processed_path": str(processed_root),
-        "marker_for": "FreeRAG 一键清理已处理过语料",
-        "status_file_for": "MyRAG 自己记录处理状态，FreeRAG 不读取 processed 状态",
-        "note": note,
-    }
-    written = []
-    if raw_root.exists():
-        raw_marker = raw_root / RAW_PROCESSED_MARKER
-        raw_marker.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-        written.append(str(raw_marker))
-    status = processed_root / PROCESSED_STATUS
-    status.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    written.append(str(status))
-    return written
-
-
 def write_processed_file(root: Path, name: str, body: str) -> None:
     root.mkdir(parents=True, exist_ok=True)
     (root / name).write_text(body.rstrip() + "\n", encoding="utf-8")
@@ -709,8 +761,7 @@ def configured_ocr_command(img_path: str, prompt: str) -> list[str]:
 def pending_voice_needs_transcript(entry: dict) -> bool:
     if entry.get("type") != "voice":
         return False
-    transcript = read_text(entry_dir(entry) / "transcript.md", 4000)
-    return not transcript.strip() or "待转译" in transcript
+    return bool(voice_mark_block_reason(entry))
 
 
 def process_entry(
@@ -1176,6 +1227,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--init-processed", help="为指定 entry id 创建中文 processed 模板")
     parser.add_argument("--mark-processed", help="把指定 entry id 标记为已处理，供 FreeRAG 一键清理原材料")
     parser.add_argument("--note", default="", help="配合 --mark-processed 记录处理说明")
+    parser.add_argument("--force-mark-voice", action="store_true", help="允许在缺少可用 transcript 时强制标记 voice；仅在用户明确确认 raw 已接盘时使用")
     parser.add_argument("--process-pending", action="store_true", help="高级：只读盘点当前 raw，输出候选材料包；不写 processed，不标记 raw")
     parser.add_argument("--mark-after-process", action="store_true", help="已禁用：批量盘点不再顺手写 _myrag_done.json")
     parser.add_argument("--include-pending-voice", action="store_true", help="已禁用：只读盘点不会标记待转译录音")
@@ -1192,7 +1244,7 @@ def main() -> int:
         return 0
 
     if args.mark_processed:
-        payload = mark_processed(args.mark_processed, args.note)
+        payload = mark_processed(args.mark_processed, args.note, force_mark_voice=args.force_mark_voice)
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         return 0
 

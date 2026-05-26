@@ -12,6 +12,7 @@ let screenRoot = corpusRoot.appendingPathComponent("screen")
 let voiceRoot = corpusRoot.appendingPathComponent("voice")
 let clipRoot = corpusRoot.appendingPathComponent("clipboard")
 let processedRoot = corpusRoot.appendingPathComponent("processed")
+let trashRoot = corpusRoot.appendingPathComponent("_trash")
 let indexURL = corpusRoot.appendingPathComponent("_index.json")
 let libraryURL = corpusRoot.appendingPathComponent("_library.json")
 let rawProcessedMarkerName = "_myrag_done.json"
@@ -135,8 +136,31 @@ func entryHasRawProcessedMarker(_ entry: [String: Any]) -> Bool {
     return false
 }
 
+func rawProcessedMarkerPayload(_ entry: [String: Any]) -> [String: Any]? {
+    guard let rawURL = rawEntryURL(for: entry) else { return nil }
+    let markerURL = rawURL.appendingPathComponent(rawProcessedMarkerName)
+    guard let data = try? Data(contentsOf: markerURL),
+          let payload = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+        return nil
+    }
+    return payload
+}
+
+func entryHasCleanableRawMarker(_ entry: [String: Any]) -> Bool {
+    guard let payload = rawProcessedMarkerPayload(entry) else { return false }
+    let schema = payload["schema"] as? String ?? ""
+    let status = payload["status"] as? String ?? ""
+    let markerEntryID = payload["entry_id"] as? String ?? ""
+    let entryID = entry["id"] as? String ?? ""
+    guard status == "processed" else { return false }
+    if !markerEntryID.isEmpty && !entryID.isEmpty && markerEntryID != entryID {
+        return false
+    }
+    return schema == "myrag.raw_processed_marker.v1" || schema == "freerag.raw_done.v1"
+}
+
 func entryIsMarkedProcessed(_ entry: [String: Any]) -> Bool {
-    entryHasRawProcessedMarker(entry)
+    entryHasCleanableRawMarker(entry)
 }
 
 func writeLLMContext(title: String, type: String, summary: String, files: [String], to dir: URL, captureGroup: String? = nil) {
@@ -212,6 +236,7 @@ final class CorpusStore {
         - `screen/`：屏幕截图和连续采样 storyboard
         - `clipboard/`：剪贴板文字和图片
         - `voice/`：本地录音和转写占位
+        - `_trash/`：FreeRAG 清理已处理 raw 时移入的可恢复原材料
 
         每个原材料条目通常包含：
         - `_meta.json`
@@ -246,7 +271,7 @@ final class CorpusStore {
 
         `screen|clipboard|voice/<entry_id>/_myrag_done.json`
 
-        FreeRAG 原材料库里的“一键清理已处理过语料”只会清理带这个标记的原材料目录，不会删除 `processed/` 里的沉淀结果。
+        FreeRAG 原材料库里的“一键清理已处理过语料”只会把带有效标记的原材料目录移入 `_trash/`，不会直接删除 raw，也不会删除 `processed/` 里的沉淀结果。
 
         FreeRAG 本身只做低成本原材料收集。Codex/Claude Code 的 MyRAG skill 负责多视角深读、OCR、转写、抽取、综合和长期沉淀。
         """
@@ -1695,7 +1720,7 @@ final class LibraryWindow: NSWindowController, NSTableViewDataSource, NSTableVie
         let sourceEntries = currentIndexEntries()
         let removableEntries = sourceEntries.filter { entry in
             guard rawEntryURL(for: entry) != nil else { return false }
-            return entryHasRawProcessedMarker(entry)
+            return entryHasCleanableRawMarker(entry)
         }
         var removableByPath: [String: URL] = [:]
         for entry in removableEntries {
@@ -1707,46 +1732,66 @@ final class LibraryWindow: NSWindowController, NSTableViewDataSource, NSTableVie
         guard !removablePaths.isEmpty else {
             let alert = NSAlert()
             alert.messageText = "没有可清理的已处理语料"
-            alert.informativeText = "MyRAG 完成处理后会写入 \(rawProcessedMarkerName)，FreeRAG 只清理带标记的原材料。"
+            alert.informativeText = "MyRAG 完成处理后会写入有效的 \(rawProcessedMarkerName)，FreeRAG 只移动带有效标记的原材料。"
             alert.runModal()
             return
         }
 
+        let trashSession = trashRoot.appendingPathComponent(timestamp("yyyyMMdd_HHmmss"))
         let duplicateIndexRows = max(0, removableEntries.count - removablePaths.count)
         let duplicateNote = duplicateIndexRows > 0
             ? "\n\n索引里另有 \(duplicateIndexRows) 行重复记录指向这些目录，也会一起从索引移除。"
             : ""
         let alert = NSAlert()
-        alert.messageText = "清理已处理过的原材料？"
-        alert.informativeText = "将删除 \(removablePaths.count) 个带 \(rawProcessedMarkerName) 标记的唯一 screen/clipboard/voice 原材料目录；processed/ 里的沉淀结果会保留。\(duplicateNote)"
-        alert.addButton(withTitle: "清理")
+        alert.messageText = "把已处理 raw 移入回收区？"
+        alert.informativeText = "将移动 \(removablePaths.count) 个带有效 \(rawProcessedMarkerName) 标记的唯一 screen/clipboard/voice 原材料目录到 ~/Documents/Corpus/_trash/；processed/ 里的沉淀结果会保留。\(duplicateNote)"
+        alert.addButton(withTitle: "移入回收区")
         alert.addButton(withTitle: "取消")
         guard alert.runModal() == .alertFirstButtonReturn else { return }
 
         let fm = FileManager.default
-        var removed = 0
+        ensureDir(trashSession)
+        var moved = 0
+        var movedPaths = Set<String>()
+        var movedRecords: [[String: String]] = []
         for path in removablePaths.sorted() {
             guard let url = removableByPath[path], fm.fileExists(atPath: url.path) else { continue }
             do {
-                try fm.removeItem(at: url)
-                removed += 1
+                let relative = url.standardizedFileURL.path.replacingOccurrences(of: corpusRoot.standardizedFileURL.path + "/", with: "")
+                var destination = trashSession.appendingPathComponent(relative)
+                ensureDir(destination.deletingLastPathComponent())
+                if fm.fileExists(atPath: destination.path) {
+                    destination = destination.deletingLastPathComponent()
+                        .appendingPathComponent("\(destination.lastPathComponent)_\(uniqueID("trash"))")
+                }
+                try fm.moveItem(at: url, to: destination)
+                moved += 1
+                movedPaths.insert(path)
+                movedRecords.append(["from": relative, "to": destination.path])
             } catch {
-                NSLog("FreeRAG failed to remove processed raw entry %@: %@", url.path, String(describing: error))
+                NSLog("FreeRAG failed to move processed raw entry %@ to trash: %@", url.path, String(describing: error))
             }
         }
+        writeJSON([
+            "schema": "freerag.cleanup_manifest.v1",
+            "time": nowISO(),
+            "moved_count": moved,
+            "duplicate_index_rows": duplicateIndexRows,
+            "items": movedRecords
+        ], to: trashSession.appendingPathComponent("cleanup_manifest.json"))
 
         let remaining = sourceEntries.filter { entry in
             guard let url = rawEntryURL(for: entry) else { return true }
-            return !removablePaths.contains(url.standardizedFileURL.path)
+            return !movedPaths.contains(url.standardizedFileURL.path)
         }
         writeCorpusIndexAndLibrary(remaining)
         refresh()
 
         let done = NSAlert()
-        done.messageText = "已清理 \(removed) 个原材料目录"
+        done.messageText = "已移入回收区 \(moved) 个原材料目录"
         done.informativeText = duplicateIndexRows > 0
-            ? "已同时从索引移除 \(duplicateIndexRows) 行重复记录。处理结果仍保留在 ~/Documents/Corpus/processed/。"
-            : "处理结果仍保留在 ~/Documents/Corpus/processed/。"
+            ? "已同时从索引移除 \(duplicateIndexRows) 行重复记录。raw 已移入 \(trashSession.path)，处理结果仍保留在 ~/Documents/Corpus/processed/。"
+            : "raw 已移入 \(trashSession.path)，处理结果仍保留在 ~/Documents/Corpus/processed/。"
         done.runModal()
     }
 }
