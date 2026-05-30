@@ -6,7 +6,7 @@ FreeRAG is currently prepared for a public GitHub beta release.
 
 - Version: `0.5.1`
 - Build: `3`
-- Suggested tag: `v0.5.1-beta.1`
+- Suggested tag: `v0.5.1-beta.2`
 - License: MIT
 
 ## Product Boundary
@@ -18,7 +18,7 @@ FreeRAG is currently prepared for a public GitHub beta release.
 
 ## Current Limitations
 
-- The beta build uses self-signed local stable signing and is not Apple Developer ID signed or notarized.
+- The beta DMG is Developer ID signed and Apple-notarized.
 - OCR and ASR are not built into the app; they are configured on the MyRAG / LLM-tool side when needed.
 - MyRAG still depends on the user's LLM environment and configured local tools.
 - Public release binaries should be attached to GitHub Releases, not committed to source.
@@ -29,4 +29,4 @@ See:
 
 - `release/github/PUBLISHING_PLAN.md`
 - `release/github/RELEASE_CHECKLIST.md`
-- `release/github/RELEASE_NOTES_v0.5.1-beta.1.md`
+- `release/github/RELEASE_NOTES_v0.5.1-beta.2.md`

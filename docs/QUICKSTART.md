@@ -18,21 +18,9 @@ Use `/Applications/FreeRAG.app` as the stable launch location. macOS privacy per
 
 Open `FreeRAG.app` from `/Applications`.
 
-The current beta is not Apple Developer ID signed or notarized. If macOS blocks it:
+The current beta DMG is Developer ID signed and Apple-notarized. It should open through the normal macOS flow after you drag the app to `/Applications`.
 
-1. Open System Settings.
-2. Go to Privacy & Security.
-3. Scroll to the security warning.
-4. Choose Open Anyway.
-
-If "Open Anyway" is not visible, use this targeted quarantine removal after dragging the app to `/Applications`:
-
-```bash
-xattr -dr com.apple.quarantine /Applications/FreeRAG.app
-open /Applications/FreeRAG.app
-```
-
-Do not disable Gatekeeper globally. The command above only removes the download quarantine flag from the installed FreeRAG app copy.
+macOS will still ask for feature permissions such as Screen Recording, Accessibility, and Microphone. Those prompts are expected.
 
 ## 3. Grant Permissions
 

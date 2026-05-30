@@ -65,24 +65,15 @@ processed/
 
 ## Why does macOS show a security warning?
 
-The current beta is open source but not Apple Developer ID signed or notarized. macOS may warn before opening it.
+The current beta DMG is Developer ID signed and Apple-notarized, so it should pass normal Gatekeeper checks.
 
-The app currently uses a self-signed local stable signing identity for local beta builds. That is better than ad-hoc signing for local permission stability, but it is not the same as Apple Developer ID signing.
+macOS may still show normal first-run or permission prompts. FreeRAG needs Screen Recording for screenshots, Accessibility for front-window context, and Microphone for local voice notes.
 
 Normal beta install flow:
 
 1. Drag `FreeRAG.app` into `/Applications`.
-2. Try to open it once.
-3. If macOS blocks it, open System Settings > Privacy & Security > Open Anyway.
-
-If that button is not visible, this targeted command removes the download quarantine flag from the installed app copy:
-
-```bash
-xattr -dr com.apple.quarantine /Applications/FreeRAG.app
-open /Applications/FreeRAG.app
-```
-
-Do not disable Gatekeeper globally.
+2. Open it from `/Applications`.
+3. Grant requested macOS privacy permissions as needed.
 
 ## Why do permissions sometimes look enabled but not work?
 
