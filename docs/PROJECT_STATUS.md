@@ -1,13 +1,21 @@
 # Project Status
 
-FreeRAG is currently prepared for a public GitHub beta release.
+FreeRAG `v0.5.1-beta.3` is the current pause point for this version line.
 
-## Current Release Target
+## Current Version
 
 - Version: `0.5.1`
-- Build: `3`
-- Suggested tag: `v0.5.1-beta.2`
+- Build: `4`
+- Release tag: `v0.5.1-beta.3`
 - License: MIT
+
+## Wrap-Up State
+
+- The public DMG path should point to the Developer ID signed and Apple-notarized beta hotfix package.
+- Build `4` fixes microphone access for hardened-runtime builds by adding the required audio-input entitlement.
+- The repo is intended to stay source-only: release binaries remain attached to GitHub Releases, not committed.
+- The core product boundary is stable for now: FreeRAG collects local raw material; MyRAG reads, mines, summarizes, and only marks raw material after user confirmation.
+- Further work should be treated as a new iteration rather than part of this version wrap-up.
 
 ## Product Boundary
 
@@ -29,4 +37,4 @@ See:
 
 - `release/github/PUBLISHING_PLAN.md`
 - `release/github/RELEASE_CHECKLIST.md`
-- `release/github/RELEASE_NOTES_v0.5.1-beta.2.md`
+- `release/github/RELEASE_NOTES_v0.5.1-beta.3.md`

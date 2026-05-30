@@ -310,8 +310,12 @@ final class Platform {
         AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
     }
 
+    func micAuthorizationStatus() -> AVAuthorizationStatus {
+        AVCaptureDevice.authorizationStatus(for: .audio)
+    }
+
     func micStatusText() -> String {
-        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        switch micAuthorizationStatus() {
         case .authorized: return "已授权"
         case .denied: return "已拒绝"
         case .restricted: return "受限制"
@@ -321,9 +325,24 @@ final class Platform {
     }
 
     func requestMic(_ done: ((Bool) -> Void)? = nil) {
-        AVCaptureDevice.requestAccess(for: .audio) { granted in
-            DispatchQueue.main.async { done?(granted) }
+        switch micAuthorizationStatus() {
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .audio) { granted in
+                DispatchQueue.main.async { done?(granted) }
+            }
+        case .denied, .restricted:
+            openMicSettings()
+            DispatchQueue.main.async { done?(false) }
+        case .authorized:
+            DispatchQueue.main.async { done?(true) }
+        @unknown default:
+            openMicSettings()
+            DispatchQueue.main.async { done?(false) }
         }
+    }
+
+    func openMicSettings() {
+        openSettings("Privacy_Microphone")
     }
 
     func openSettings(_ pane: String) {
@@ -1437,12 +1456,14 @@ final class SettingsWindow: NSWindowController {
         let screenOK = platform.screenGranted()
         let accessOK = platform.accessibilityGranted()
         let micOK = platform.micGranted()
+        let micAuth = platform.micAuthorizationStatus()
         screenStatus.set(screenOK ? "已就绪" : "未生效", ok: screenOK)
         accessStatus.set(accessOK ? "已就绪" : "未生效", ok: accessOK)
         micStatus.set(platform.micStatusText(), ok: platform.micGranted())
         screenButton?.isEnabled = !screenOK
         accessButton?.isEnabled = !accessOK
         micButton?.isEnabled = !micOK
+        micButton?.title = micAuth == .notDetermined ? "准备" : "打开"
         restartButton?.isHidden = screenOK && accessOK && micOK
     }
 }

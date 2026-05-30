@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.5.1-beta.3 - 2026-05-30
+
+- Bumped the `0.5.1` app build to `4` for a microphone permission hotfix.
+- Added the hardened-runtime entitlement for microphone audio input.
+- Updated the settings window so microphone permission requests open System Settings when macOS has already denied or restricted access.
+
+## v0.5.1-beta.2 - 2026-05-30
+
+- Kept the `0.5.1` app version and build `3`, but upgraded the public DMG distribution to Developer ID signed and Apple-notarized.
+- Added repeatable Developer ID release packaging through `FreeRAG/Packaging/build_release_dmg.sh`, including signing, notarization, stapling, Gatekeeper validation, and checksum generation.
+- Added the offline `FreeRAG/CLI/freerag` helper for agent/script workflows that write directly to the local corpus schema.
+- Made processed-raw cleanup recoverable by moving marked raw entries into `~/Documents/Corpus/_trash/<timestamp>/` with a cleanup manifest instead of deleting them permanently.
+- Tightened MyRAG safety rules: only structured `_myrag_done.json` markers are cleanable, voice entries require a usable transcript before marking, and sampling cannot justify marking unreviewed entries as processed.
+- Updated public README, release notes, release checklist, and product docs for the notarized beta distribution path.
+
 ## v0.5.1-beta.1 - 2026-05-25
 
 - Fixed the HUD bar not returning above full-screen Spaces after hiding it and using the menu bar "Show HUD" command.

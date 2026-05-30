@@ -7,6 +7,7 @@ APP="$ROOT/dist/FreeRAG.app"
 EXE="$APP/Contents/MacOS/FreeRAG"
 ICON="$NATIVE/Resources/Assets/freerag.icns"
 STATUS_ICON="$NATIVE/Resources/Assets/freerag_status_template.png"
+ENTITLEMENTS="$NATIVE/Packaging/FreeRAG.entitlements"
 DEFAULT_SIGN_IDENTITY="FreeRAG Local Developer"
 SIGN_IDENTITY="${FREERAG_CODESIGN_IDENTITY:-}"
 HARDENED_RUNTIME="${FREERAG_CODESIGN_HARDENED:-0}"
@@ -34,6 +35,8 @@ if [ -f "$STATUS_ICON" ]; then
   cp "$STATUS_ICON" "$APP/Contents/Resources/StatusIcon.png"
 fi
 
+xattr -cr "$APP" 2>/dev/null || true
+
 if [ -z "$SIGN_IDENTITY" ]; then
   if security find-identity -v -p codesigning | grep -F "\"$DEFAULT_SIGN_IDENTITY\"" >/dev/null; then
     SIGN_IDENTITY="$DEFAULT_SIGN_IDENTITY"
@@ -46,6 +49,9 @@ fi
 CODE_SIGN_ARGS=(--force --deep --sign "$SIGN_IDENTITY")
 if [ "$HARDENED_RUNTIME" = "1" ]; then
   CODE_SIGN_ARGS+=(--options runtime --timestamp)
+fi
+if [ -f "$ENTITLEMENTS" ]; then
+  CODE_SIGN_ARGS+=(--entitlements "$ENTITLEMENTS")
 fi
 codesign "${CODE_SIGN_ARGS[@]}" "$APP" >/dev/null
 echo "$APP"

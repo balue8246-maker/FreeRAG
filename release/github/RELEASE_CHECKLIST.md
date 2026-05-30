@@ -14,11 +14,14 @@
 - [ ] `python3 -m html.parser docs/product_overview.en.html`
 - [ ] `python3 -m html.parser docs/product_overview.zh-CN.html`
 - [ ] `plutil -lint FreeRAG/Info.plist dist/FreeRAG.app/Contents/Info.plist`
+- [ ] `plutil -lint FreeRAG/Packaging/FreeRAG.entitlements`
 - [ ] `codesign --verify --deep --strict --verbose=1 dist/FreeRAG.app`
-- [ ] `codesign --verify --verbose=2 dist/FreeRAG-0.5.1-build-3.dmg`
-- [ ] `xcrun stapler validate dist/FreeRAG-0.5.1-build-3.dmg`
-- [ ] `spctl -a -vvv -t install dist/FreeRAG-0.5.1-build-3.dmg`
-- [ ] `hdiutil imageinfo dist/FreeRAG-0.5.1-build-3.dmg`
+- [ ] `codesign -d --entitlements - dist/FreeRAG.app` includes `com.apple.security.device.audio-input`.
+- [ ] Mount the final DMG and verify the contained `FreeRAG.app` signature and microphone entitlement.
+- [ ] `codesign --verify --verbose=2 dist/FreeRAG-0.5.1-build-4.dmg`
+- [ ] `xcrun stapler validate dist/FreeRAG-0.5.1-build-4.dmg`
+- [ ] `spctl -a -vvv -t install dist/FreeRAG-0.5.1-build-4.dmg`
+- [ ] `hdiutil imageinfo dist/FreeRAG-0.5.1-build-4.dmg`
 
 ## Release Assets
 
@@ -27,7 +30,7 @@
 - [ ] Generate checksum:
 
 ```bash
-shasum -a 256 dist/FreeRAG-0.5.1-build-3.dmg > dist/FreeRAG-0.5.1-build-3.dmg.sha256
+shasum -a 256 dist/FreeRAG-0.5.1-build-4.dmg > dist/FreeRAG-0.5.1-build-4.dmg.sha256
 ```
 
 - [ ] Attach both files to GitHub Release.

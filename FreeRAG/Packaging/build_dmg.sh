@@ -19,7 +19,8 @@ fi
 rm -rf "$STAGE" "$DMG" "$TMP_DMG"
 mkdir -p "$STAGE/MyRAG skill" "$STAGE/.background"
 
-ditto "$APP" "$STAGE/FreeRAG.app"
+ditto --noextattr --noqtn "$APP" "$STAGE/FreeRAG.app"
+xattr -cr "$STAGE/FreeRAG.app" 2>/dev/null || true
 ln -s /Applications "$STAGE/Applications"
 ditto "$ROOT/shared/skills/myrag" "$STAGE/MyRAG skill/myrag"
 if [ -f "$BACKGROUND" ]; then

@@ -9,7 +9,7 @@ It is built for people who use Codex / Claude Code and keep losing useful contex
 **Open Source Beta:** FreeRAG is distributed through GitHub Releases as a Developer ID signed and Apple-notarized DMG.
 
 <p>
-  <a href="https://github.com/balue8246-maker/FreeRAG/releases/download/v0.5.1-beta.2/FreeRAG-0.5.1-build-3.dmg"><strong>Download DMG</strong></a>
+  <a href="https://github.com/balue8246-maker/FreeRAG/releases/download/v0.5.1-beta.3/FreeRAG-0.5.1-build-4.dmg"><strong>Download DMG</strong></a>
   ·
   <a href="docs/QUICKSTART.md">Quickstart</a>
   ·
@@ -34,9 +34,9 @@ It is built for people who use Codex / Claude Code and keep losing useful contex
 
 ## Download
 
-- [Download DMG](https://github.com/balue8246-maker/FreeRAG/releases/download/v0.5.1-beta.2/FreeRAG-0.5.1-build-3.dmg)
+- [Download DMG](https://github.com/balue8246-maker/FreeRAG/releases/download/v0.5.1-beta.3/FreeRAG-0.5.1-build-4.dmg)
 - [Latest GitHub Release](https://github.com/balue8246-maker/FreeRAG/releases/latest)
-- Current beta: `0.5.1`, build `3`
+- Current beta: `0.5.1`, build `4`
 - macOS app: Swift / AppKit, menu bar only
 
 This beta build is Developer ID signed and Apple-notarized. macOS may still ask for normal app permissions such as Screen Recording, Accessibility, and Microphone.
@@ -86,7 +86,7 @@ FreeRAG/Packaging/build_dmg.sh
 
 Local build output goes to `dist/`. `dist/` is intentionally ignored by Git; public binaries should be attached to GitHub Releases instead of committed to the source repository.
 
-Current app version: `0.5.1`, build `3`.
+Current app version: `0.5.1`, build `4`.
 
 Developer ID release build:
 
