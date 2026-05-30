@@ -9,6 +9,7 @@ ICON="$NATIVE/Resources/Assets/freerag.icns"
 STATUS_ICON="$NATIVE/Resources/Assets/freerag_status_template.png"
 DEFAULT_SIGN_IDENTITY="FreeRAG Local Developer"
 SIGN_IDENTITY="${FREERAG_CODESIGN_IDENTITY:-}"
+HARDENED_RUNTIME="${FREERAG_CODESIGN_HARDENED:-0}"
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
@@ -42,5 +43,9 @@ if [ -z "$SIGN_IDENTITY" ]; then
   fi
 fi
 
-codesign --force --deep --sign "$SIGN_IDENTITY" "$APP" >/dev/null
+CODE_SIGN_ARGS=(--force --deep --sign "$SIGN_IDENTITY")
+if [ "$HARDENED_RUNTIME" = "1" ]; then
+  CODE_SIGN_ARGS+=(--options runtime --timestamp)
+fi
+codesign "${CODE_SIGN_ARGS[@]}" "$APP" >/dev/null
 echo "$APP"

@@ -88,6 +88,14 @@ Local build output goes to `dist/`. `dist/` is intentionally ignored by Git; pub
 
 Current app version: `0.5.1`, build `3`.
 
+Developer ID release build:
+
+```bash
+FreeRAG/Packaging/build_release_dmg.sh
+```
+
+This script signs `FreeRAG.app` with `Developer ID Application`, builds and signs the DMG, submits it with `notarytool`, staples the ticket, runs Gatekeeper checks, and updates the local `.sha256` file. It expects a stored notary profile named `freerag-notary` unless `FREERAG_NOTARY_PROFILE` is set.
+
 ## CLI
 
 FreeRAG also includes a lightweight offline CLI for agent and script workflows. It does not control the running menu bar app; it writes directly to the same local corpus schema.

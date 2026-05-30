@@ -88,6 +88,14 @@ FreeRAG/Packaging/build_dmg.sh
 
 当前版本：`0.5.1`，构建号 `3`。
 
+Developer ID 发布构建：
+
+```bash
+FreeRAG/Packaging/build_release_dmg.sh
+```
+
+该脚本会用 `Developer ID Application` 签名 `FreeRAG.app`，构建并签名 DMG，通过 `notarytool` 提交 Apple notarization，staple 票据，执行 Gatekeeper 校验，并更新本地 `.sha256` 文件。默认使用名为 `freerag-notary` 的 notary profile；也可以通过 `FREERAG_NOTARY_PROFILE` 指定。
+
 ## CLI
 
 FreeRAG 也带一个轻量离线 CLI，给 agent 和脚本使用。它不控制正在运行的菜单栏 app，而是直接写入同一套本地 corpus 协议。

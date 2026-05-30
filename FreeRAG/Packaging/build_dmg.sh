@@ -10,6 +10,7 @@ DMG="$ROOT/dist/FreeRAG-${VERSION}-build-${BUILD}.dmg"
 STAGE="/private/tmp/freerag-dmg-${VERSION}-${BUILD}"
 TMP_DMG="/private/tmp/freerag-dmg-${VERSION}-${BUILD}.rw.dmg"
 BACKGROUND="$NATIVE/Resources/Assets/dmg_background.png"
+FREERAG_DISTRIBUTION="${FREERAG_DISTRIBUTION:-beta}"
 
 if [ ! -d "$APP" ]; then
   "$ROOT/FreeRAG/Packaging/build_native_app.sh" >/dev/null
@@ -23,6 +24,16 @@ ln -s /Applications "$STAGE/Applications"
 ditto "$ROOT/shared/skills/myrag" "$STAGE/MyRAG skill/myrag"
 if [ -f "$BACKGROUND" ]; then
   cp "$BACKGROUND" "$STAGE/.background/background.png"
+fi
+
+if [ "$FREERAG_DISTRIBUTION" = "notarized" ]; then
+  DISTRIBUTION_EN="FreeRAG is distributed through GitHub Releases as a Developer ID signed and Apple-notarized DMG."
+  DISTRIBUTION_ZH="FreeRAG 通过 GitHub Release 发布 DMG。当前包已使用 Apple Developer ID 签名并完成 Apple notarization。"
+  PERMISSIONS_EN="This package is Developer ID signed and notarized. If macOS still blocks launch, open System Settings > Privacy & Security and choose Open Anyway."
+else
+  DISTRIBUTION_EN="FreeRAG is distributed through GitHub Releases as a DMG. This beta is not Apple Developer ID signed or notarized, so the first launch may require manual approval in macOS settings."
+  DISTRIBUTION_ZH="FreeRAG 通过 GitHub Release 发布 DMG。当前 beta 尚未使用 Apple Developer ID 签名或公证，所以首次打开时可能需要在 macOS 设置里手动允许。"
+  PERMISSIONS_EN="This beta package is self-signed locally and is not Apple Developer ID signed or notarized. If macOS blocks it, open System Settings > Privacy & Security and choose Open Anyway."
 fi
 
 cat > "$STAGE/Install Guide.txt" <<EOF
@@ -53,16 +64,15 @@ MyRAG skill install:
 - Use INSTALL_ADAPTERS.md only when your model needs Vision/OCR or ASR setup.
 
 Open Source Beta:
-FreeRAG is distributed through GitHub Releases as a DMG. This beta is not Apple Developer ID signed or notarized, so the first launch may require manual approval in macOS settings.
+${DISTRIBUTION_EN}
 
 开源 Beta：
-FreeRAG 通过 GitHub Release 发布 DMG。当前 beta 尚未使用 Apple Developer ID 签名或公证，所以首次打开时可能需要在 macOS 设置里手动允许。
+${DISTRIBUTION_ZH}
 
 Permissions:
 macOS permissions are tied mainly to bundle id, signing identity, and app location.
 Changing only CFBundleShortVersionString/CFBundleVersion should not require re-authorizing.
-This beta package is self-signed locally and is not Apple Developer ID signed or notarized.
-If macOS blocks it, open System Settings > Privacy & Security and choose Open Anyway.
+${PERMISSIONS_EN}
 EOF
 
 hdiutil create \
